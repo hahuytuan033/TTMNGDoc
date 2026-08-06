@@ -275,20 +275,44 @@ TT.StartEntranceMission(new TTStartEntranceMissionParam
 ```
 
 #### 6.2 GetEntranceMissionReward
-Nhận phần thưởng nhiệm vụ lối vào.
+Kiểm tra & nhận phần thưởng nhiệm vụ lối vào.
+
+> **Quan trọng:** Callback `success` trả về đối tượng `TTGetEntranceMissionRewardResult` có field **`canReceiveReward`** (bool). Đây là cờ để quyết định có cấp thưởng cho người chơi hay không — nền tảng TikTok tự xác thực người chơi đã hoàn thành nhiệm vụ (mở game trong TikTok Minis rồi quay lại). Client **không tự quyết định**, chỉ đọc cờ này.
+>
+> - `success` + `canReceiveReward == true` → đủ điều kiện → **cấp thưởng**.
+> - `success` + `canReceiveReward == false` → chưa hoàn thành nhiệm vụ → **không cấp**, nhắc người chơi làm tiếp.
+> - `fail` → lỗi hệ thống/mạng (khác với "chưa đủ điều kiện") → báo lỗi, cho thử lại.
+>
+> Kết quả **không chứa số lượng thưởng** (ví dụ 💎×100). Con số phần thưởng do nền tảng TikTok cấu hình; cần thống nhất với TikTok xem game tự cộng hay nền tảng tự cộng vào tài khoản.
+
 ```csharp
 TT.GetEntranceMissionReward(new TTGetEntranceMissionRewardParam
 {
     success = (data) =>
     {
-        Debug.Log("Nhận phần thưởng thành công");
+        if (data.canReceiveReward)
+        {
+            Debug.Log("Đủ điều kiện — cấp phần thưởng");
+            // GrantReward(); ẩn popup "Get reward"
+        }
+        else
+        {
+            Debug.Log("Chưa hoàn thành nhiệm vụ, chưa thể nhận thưởng");
+            // ShowToast("Hãy mở game trong TikTok Minis rồi quay lại");
+        }
     },
     fail = (error) =>
     {
-        Debug.Log($"Nhận thất bại: {error}");
+        Debug.Log($"Nhận thất bại (lỗi hệ thống): {error}");
     }
 });
 ```
+
+**Cấu trúc kết quả (`TTGetEntranceMissionRewardResult`, kế thừa `GeneralCallbackResult`):**
+
+| Field | Kiểu | Mô tả |
+| :--- | :--- | :--- |
+| canReceiveReward | bool | `true` nếu người chơi đã hoàn thành nhiệm vụ và đủ điều kiện nhận thưởng |
 
 ### 7. Vòng đời Game
 
