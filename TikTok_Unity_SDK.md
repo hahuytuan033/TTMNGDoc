@@ -256,20 +256,48 @@ TT.NavigateToBalance(new TTNavigateToBalanceParam
 });
 ```
 
-### 6. Nhiệm vụ lối vào (Entrance Mission)
+### 6. Nhiệm vụ lối vào — Quay lại qua Sidebar (Entrance Mission / Sidebar Revisit)
+
+> **Yêu cầu phiên bản:** client TikTok **≥ 41.0.0**. SDK Unity **không tự kiểm tra** — bắt buộc dùng `CanIUse` (mục 16) trước mỗi lần gọi, nếu không sẽ lỗi runtime trên máy cài bản TikTok cũ.
+>
+> **Luồng nghiệp vụ (quan trọng):** `StartEntranceMission` **đưa người chơi rời khỏi game**, nhảy sang sidebar TikTok Profile để hoàn thành bài "hướng dẫn quay lại" — mục đích là chỉ cho họ lối vào game để lần sau mở lại. Game rơi xuống background (`OnHide`). Chỉ khi người chơi quay lại game (`OnShow`) mới nên gọi `GetEntranceMissionReward` để đọc cờ `canReceiveReward`. Gọi `GetEntranceMissionReward` ngay sau `StartEntranceMission` trong cùng frame sẽ luôn nhận `false`. Xem luồng đầy đủ ở mục 6.3.
 
 #### 6.1 StartEntranceMission
-Bắt đầu nhiệm vụ lối vào.
+Đưa người chơi tới sidebar TikTok Profile để thực hiện nhiệm vụ quay lại.
+
+**Chữ ký:** `public static void StartEntranceMission(TTStartEntranceMissionParam param)`
+
+**`TTStartEntranceMissionParam`** kế thừa `ICallback<TTCheckBalanceResult, ErrorInfo, GeneralCallbackResult>`, các field **viết thường**:
+
+| Field | Kiểu | Mô tả |
+| :--- | :--- | :--- |
+| success | `Action<TTCheckBalanceResult>` | Gọi khi đã chuyển hướng thành công. SDK dùng lại kiểu `TTCheckBalanceResult` (chỉ có field `is_sufficient`) — **không phải** thông tin nhiệm vụ, chỉ nên log để chẩn đoán, không dùng làm điều kiện cấp thưởng. |
+| fail | `Action<ErrorInfo>` | Chuyển hướng thất bại; đọc `error.ErrMsg` |
+| complete | `Action<GeneralCallbackResult>` | Luôn được gọi (cả success lẫn fail). Khác JSAPI: bản Unity **có tham số**, không phải `() => void`. |
+
 ```csharp
+if (!CanIUse.StartEntranceMission)
+{
+    // Client TikTok < 41.0.0 → ẩn nút nhiệm vụ, không gọi API
+    entranceMissionButton.gameObject.SetActive(false);
+    return;
+}
+
 TT.StartEntranceMission(new TTStartEntranceMissionParam
 {
     success = (data) =>
     {
-        Debug.Log("Bắt đầu nhiệm vụ lối vào");
+        Debug.Log("Đã chuyển sang sidebar TikTok Profile");
+        // Đánh dấu đang chờ nhiệm vụ để lần OnShow tới sẽ kiểm tra thưởng
+        _waitingEntranceMission = true;
     },
     fail = (error) =>
     {
-        Debug.Log($"Bắt đầu thất bại: {error}");
+        Debug.Log($"Bắt đầu thất bại: {error.ErrMsg}");
+    },
+    complete = (res) =>
+    {
+        Debug.Log("Yêu cầu hoàn tất");
     }
 });
 ```
@@ -285,7 +313,13 @@ Kiểm tra & nhận phần thưởng nhiệm vụ lối vào.
 >
 > Kết quả **không chứa số lượng thưởng** (ví dụ 💎×100). Con số phần thưởng do nền tảng TikTok cấu hình; cần thống nhất với TikTok xem game tự cộng hay nền tảng tự cộng vào tài khoản.
 
+**Chữ ký:** `public static void GetEntranceMissionReward(TTGetEntranceMissionRewardParam param)`
+
+**`TTGetEntranceMissionRewardParam`** kế thừa `ICallback<TTGetEntranceMissionRewardResult, ErrorInfo, GeneralCallbackResult>`, field **viết thường**: `success` / `fail` / `complete`.
+
 ```csharp
+if (!CanIUse.GetEntranceMissionReward) return;
+
 TT.GetEntranceMissionReward(new TTGetEntranceMissionRewardParam
 {
     success = (data) =>
@@ -303,7 +337,11 @@ TT.GetEntranceMissionReward(new TTGetEntranceMissionRewardParam
     },
     fail = (error) =>
     {
-        Debug.Log($"Nhận thất bại (lỗi hệ thống): {error}");
+        Debug.Log($"Nhận thất bại (lỗi hệ thống): {error.ErrMsg}");
+    },
+    complete = (res) =>
+    {
+        Debug.Log("Yêu cầu hoàn tất");
     }
 });
 ```
@@ -313,6 +351,73 @@ TT.GetEntranceMissionReward(new TTGetEntranceMissionRewardParam
 | Field | Kiểu | Mô tả |
 | :--- | :--- | :--- |
 | canReceiveReward | bool | `true` nếu người chơi đã hoàn thành nhiệm vụ và đủ điều kiện nhận thưởng |
+
+#### 6.3 Luồng hoàn chỉnh (bắt buộc dùng cùng vòng đời ứng dụng)
+
+Vì `StartEntranceMission` đẩy game xuống background, việc kiểm tra thưởng **phải** móc vào `OnShow` của `TT.GetAppLifeCycle()` (mục 7.1):
+
+```csharp
+using TTSDK;
+using UnityEngine;
+
+public class EntranceMissionFlow : MonoBehaviour
+{
+    [SerializeField] private GameObject missionButton;   // nút "Nhận thưởng"
+    private bool _waitingEntranceMission;
+
+    // Gọi sau khi callback của TT.InitSDK() hoàn tất
+    public void Setup()
+    {
+        bool available = CanIUse.StartEntranceMission && CanIUse.GetEntranceMissionReward;
+        missionButton.SetActive(available);
+        if (!available) return;                          // TikTok < 41.0.0 → ẩn hẳn tính năng
+
+        TT.GetAppLifeCycle().OnShow += _ =>
+        {
+            if (!_waitingEntranceMission) return;
+            _waitingEntranceMission = false;
+            CheckReward();                               // người chơi vừa quay lại → kiểm tra cờ
+        };
+    }
+
+    public void OnMissionButtonClicked()
+    {
+        TT.StartEntranceMission(new TTStartEntranceMissionParam
+        {
+            success = _ => _waitingEntranceMission = true,
+            fail = e => Debug.LogWarning($"StartEntranceMission fail: {e.ErrMsg}")
+        });
+    }
+
+    private void CheckReward()
+    {
+        TT.GetEntranceMissionReward(new TTGetEntranceMissionRewardParam
+        {
+            success = data =>
+            {
+                if (data.canReceiveReward) GrantReward();
+                else ShowToast("Hãy mở game từ sidebar TikTok rồi quay lại nhé");
+            },
+            fail = e => ShowToast("Có lỗi xảy ra, thử lại sau")
+        });
+    }
+
+    private void GrantReward() { /* cộng thưởng + ẩn nút */ }
+    private void ShowToast(string msg) { /* UI của game */ }
+}
+```
+
+**Bẫy thường gặp:**
+- Gọi `GetEntranceMissionReward` ngay sau `StartEntranceMission` → luôn `false`.
+- Không guard `CanIUse` → crash/no-op im lặng trên client cũ.
+- Coi `fail` là "chưa đủ điều kiện" → sai; `fail` là lỗi hệ thống, "chưa đủ điều kiện" là `success` + `canReceiveReward == false`.
+- Chạy trong Unity Editor: các API này chỉ hoạt động trong container thật, kiểm tra `TT.InContainerEnv` trước khi bật UI khi debug.
+
+#### 6.4 ShowRevisitGuide — cơ chế quay lại thứ hai (chưa gọi được)
+
+SDK có sẵn lớp public `TTSDK.TTFavorite` với `ShowRevisitGuide(Action<bool> callback)` (WebGL method `showRevisitGuide`, yêu cầu **container ≥ 6.2.0**) — hiện bong bóng hướng dẫn quay lại **ngay trong game**, khác hẳn `StartEntranceMission` là chuyển người chơi ra ngoài sidebar. Cùng nhóm: `Collect` / `CancelCollection` / `IsCollected` / `ShowFavoriteGuide` (container ≥ 3.3). `CanIUse.ShowRevisitGuide` và `CanIUse.ShowFavoriteGuide` cũng đã có.
+
+**Nhưng chưa dùng được:** accessor duy nhất là `ITTAPI.GetTTFavorite()`, mà `ITTAPI` là interface `private` và `TT.TTInner` có access modifier `assembly` (internal) → code game **không lấy được instance `TTFavorite`**. Đã kiểm chứng bằng cách dịch ngược `ttsdk.dll` trên **cả 1.0.37-Beta** (gói trong repo này) **và 1.1.3-Release** (bản game `leftright1` đang dùng). Nếu cần tính năng này phải xin TikTok bản SDK expose public hoặc chờ bản mới.
 
 ### 7. Vòng đời Game
 
@@ -490,45 +595,99 @@ Hủy lắng nghe sự thay đổi trạng thái mạng yếu.
 TT.OffNetworkWeakChange();
 ```
 
-### 11. Phím tắt (Shortcut)
+### 11. Phím tắt màn hình chính (Shortcut)
+
+> **Yêu cầu phiên bản:** client TikTok **≥ 41.0.0**. Bắt buộc guard bằng `CanIUse.AddShortcut` / `CanIUse.GetShortcutMissionReward` (mục 16) trước khi gọi.
+>
+> `AddShortcut` kích hoạt **hộp thoại cấp hệ điều hành** để đưa icon game ra màn hình chính. Người dùng có thể bấm Hủy, và Android 8+ chỉ cho phép khi launcher hỗ trợ (thường còn bị giới hạn số lần hỏi). Vì vậy `success == false` **không đồng nghĩa với lỗi kỹ thuật** — đừng hiện thông báo lỗi đỏ cho người chơi.
 
 #### 11.1 AddShortcut
 Tạo shortcut (lối tắt) trên màn hình chính.
+
+**Chữ ký đầy đủ:**
 ```csharp
+public static void AddShortcut(Action<bool> csCallback, bool showToastTipsIfFailed = true)
+```
+
+| Tham số | Kiểu | Mặc định | Mô tả |
+| :--- | :--- | :--- | :--- |
+| csCallback | `Action<bool>` | — | `true` = đã tạo shortcut; `false` = người dùng hủy **hoặc** hệ thống từ chối |
+| showToastTipsIfFailed | `bool` | `true` | Cho container tự hiện toast khi tạo thất bại. Đặt `false` nếu game muốn tự hiển thị thông báo, tránh hiện hai toast chồng nhau. |
+
+```csharp
+if (!CanIUse.AddShortcut)
+{
+    addShortcutButton.gameObject.SetActive(false);   // TikTok < 41.0.0
+    return;
+}
+
 TT.AddShortcut(
     csCallback: (success) =>
     {
-        Debug.Log($"Tạo shortcut: {(success ? "Thành công" : "Thất bại")}");
-    }
+        Debug.Log($"Tạo shortcut: {(success ? "Thành công" : "Thất bại/Hủy")}");
+        if (success) CheckShortcutReward();          // xem 11.2
+    },
+    showToastTipsIfFailed: false                     // game tự hiển thị thông báo
 );
 ```
 
+> **Khác biệt so với JSAPI:** ở tầng JS, `addShortcut` có `fail(error)` với `{ error_code, error_msg }`. Bản Unity gộp tất cả vào một `bool` duy nhất → **không phân biệt được** "người dùng bấm Hủy" với "hệ thống chặn". Nếu cần error code phải đọc log container bằng DevTool.
+>
+> **Không có API kiểm tra shortcut đã tồn tại.** SDK có `CanIUse.CheckShortcut` và bên trong `TTAPIImpl` có `IsShortcutExist(Action<bool>)`, nhưng chỉ truy cập được qua interface `ITTAPI` (private) / `TT.TTInner` (internal) → **code game không gọi được** (đúng với cả 1.0.37-Beta lẫn 1.1.3-Release). Muốn tránh hỏi lại người đã tạo shortcut thì phải tự lưu cờ vào `TT.PlayerPrefs`.
+
 #### 11.2 GetShortcutMissionReward
-Lấy thông tin phần thưởng nhiệm vụ lối tắt.
+Kiểm tra người chơi có đủ điều kiện nhận thưởng nhiệm vụ tạo lối tắt hay không.
+
+> **Quan trọng — giống hệt mục 6.2:** `Success` trả về `GetShortcutMissionRewardSuccessResult` với field **`CanReceiveReward`** (bool). Nền tảng TikTok tự xác thực, client **chỉ đọc cờ**, không tự quyết định.
+>
+> - `Success` + `CanReceiveReward == true` → **cấp thưởng**.
+> - `Success` + `CanReceiveReward == false` → chưa đủ điều kiện → **không cấp**.
+> - `Fail` → lỗi hệ thống/mạng (khác với "chưa đủ điều kiện") → cho thử lại.
+>
+> Kết quả **không chứa số lượng thưởng**; con số do nền tảng TikTok cấu hình, cần thống nhất với TikTok xem game tự cộng hay nền tảng cộng.
+
+**Chữ ký:** `public static void GetShortcutMissionReward(GetShortcutMissionRewardParam param)`
+
+**`GetShortcutMissionRewardParam`** — field **viết hoa** (khác họ `TT*Param` ở mục 6 dùng chữ thường):
+
+| Field | Kiểu | Mô tả |
+| :--- | :--- | :--- |
+| Success | `Action<GetShortcutMissionRewardSuccessResult>` | Kết quả có field `CanReceiveReward` (bool) |
+| Fail | `Action<ErrorInfo>` | Đọc `error.ErrMsg` |
+| Complete | `Action` | **Không có tham số** (khác `complete` ở mục 6) |
+
 ```csharp
-TT.GetShortcutMissionReward(new GetShortcutMissionRewardParam
+void CheckShortcutReward()
 {
-    Success = (result) =>
+    if (!CanIUse.GetShortcutMissionReward) return;
+
+    TT.GetShortcutMissionReward(new GetShortcutMissionRewardParam
     {
-        if (result.CanReceiveReward)
+        Success = (result) =>
         {
-            Debug.Log("Người dùng có thể nhận phần thưởng lối tắt");
-        }
-        else
+            if (result.CanReceiveReward)
+            {
+                Debug.Log("Người dùng có thể nhận phần thưởng lối tắt");
+                // GrantReward();
+            }
+            else
+            {
+                Debug.Log("Người dùng tạm thời chưa thể nhận phần thưởng");
+            }
+        },
+        Fail = (error) =>
         {
-            Debug.Log("Người dùng tạm thời chưa thể nhận phần thưởng");
+            Debug.Log($"Lấy thông tin thất bại: {error.ErrMsg}");
+        },
+        Complete = () =>
+        {
+            Debug.Log("Yêu cầu hoàn tất");
         }
-    },
-    Fail = (error) =>
-    {
-        Debug.Log($"Lấy thông tin thất bại: {error.ErrMsg}");
-    },
-    Complete = () =>
-    {
-        Debug.Log("Yêu cầu hoàn tất");
-    }
-});
+    });
+}
 ```
+
+> **Cẩn thận khi dùng IntelliSense:** SDK còn chứa cặp `TTGetShortcutMissionRewardParam` / `TTGetShortcutMissionRewardResult` (họ `ICallback`, field chữ thường `success`/`fail`/`complete`). **Không có method public nào nhận kiểu này** — `TT.GetShortcutMissionReward` chỉ nhận `GetShortcutMissionRewardParam`. Chọn nhầm sẽ không compile.
 
 ### 12. Chia sẻ xã hội (Social Share)
 
@@ -1030,6 +1189,8 @@ void ShareContent()
 
 #### 16.4 Lưu ý
 1. Kiểm tra sau khi khởi tạo: Việc kiểm tra `CanIUse` nên được thực hiện sau khi `TT.InitSDK()` hoàn tất.
+2. Mỗi thuộc tính `CanIUse.X` chỉ là wrapper gọi thẳng `canIUse("x")` của JSAPI (ví dụ `CanIUse.AddShortcut` → `canIUse("addShortcut")`). Tên thuộc tính C# viết hoa chữ đầu, tên JSAPI viết thường chữ đầu.
+3. Không cache kết quả `CanIUse` qua nhiều phiên chơi — người dùng có thể cập nhật app TikTok giữa chừng.
 
 #### 16.5 Danh sách thuộc tính CanIUse phổ biến
 
@@ -1039,6 +1200,13 @@ void ShareContent()
 | VibrateShort | Rung ngắn | >= 43.8.0 |
 | VibrateLong | Rung dài | >= 43.8.0 |
 | GetFileSystemManager | Quản lý tệp (File Manager) | Không có |
+| AddShortcut | Tạo shortcut màn hình chính | >= 41.0.0 |
+| GetShortcutMissionReward | Thưởng nhiệm vụ shortcut | >= 41.0.0 |
+| StartEntranceMission | Nhiệm vụ quay lại qua sidebar | >= 41.0.0 |
+| GetEntranceMissionReward | Thưởng nhiệm vụ quay lại | >= 41.0.0 |
+| CheckShortcut | Kiểm tra shortcut đã tồn tại | Có thuộc tính nhưng **chưa có API public tương ứng** (mục 11.1) |
+| ShowRevisitGuide | Bong bóng hướng dẫn quay lại trong game | Container >= 6.2.0; **chưa gọi được** (mục 6.4) |
+| ShowFavoriteGuide | Bong bóng hướng dẫn thêm vào yêu thích | Container >= 3.3; **chưa gọi được** (mục 6.4) |
 
 ### 17. Bảng tra cứu nhanh API
 
@@ -1062,9 +1230,9 @@ void ShareContent()
 | Recharge | Nạp tiền |
 | Pay | Thanh toán |
 | NavigateToBalance | Chuyển hướng đến trang số dư |
-| **Nhiệm vụ lối vào** | |
-| StartEntranceMission | Bắt đầu nhiệm vụ |
-| GetEntranceMissionReward | Nhận phần thưởng |
+| **Nhiệm vụ lối vào (cần TikTok >= 41.0.0 + CanIUse)** | |
+| StartEntranceMission | Chuyển người chơi sang sidebar TikTok Profile |
+| GetEntranceMissionReward | Đọc cờ `canReceiveReward` (gọi lại ở `OnShow`) |
 | **Vòng đời** | |
 | GetAppLifeCycle | Trình quản lý vòng đời |
 | SetOnBeforeExitAppListener | Lắng nghe khi thoát |
@@ -1084,9 +1252,9 @@ void ShareContent()
 | OffNetworkStatusChange | Hủy lắng nghe trạng thái mạng |
 | OnNetworkWeakChange | Lắng nghe mạng yếu |
 | OffNetworkWeakChange | Hủy lắng nghe mạng yếu |
-| **Phím tắt** | |
-| AddShortcut | Tạo shortcut |
-| GetShortcutMissionReward | Phần thưởng lối tắt |
+| **Phím tắt (cần TikTok >= 41.0.0 + CanIUse)** | |
+| AddShortcut | Tạo shortcut — `(Action<bool> csCallback, bool showToastTipsIfFailed = true)` |
+| GetShortcutMissionReward | Đọc cờ `CanReceiveReward` |
 | **Chia sẻ xã hội** | |
 | ShareAppMessage | Chia sẻ tin nhắn |
 | **Quảng cáo** | |
