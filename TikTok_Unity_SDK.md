@@ -1,4 +1,4 @@
-**【Tài liệu này ngừng cập nhật】 Hướng dẫn sử dụng TikTok Unity SDK (Tính năng thử nghiệm nội bộ)**
+# Hướng dẫn sử dụng TikTok Unity SDK
 
 !!! Các game Unity đã lên sóng trước ngày 5/3, có thể tải lên (upload) lại nền tảng và phát hành bản mới. Chúng tôi đã thêm một bản tối ưu hóa hiệu suất, cần phải tải lên lại thì mới kích hoạt được.
 
