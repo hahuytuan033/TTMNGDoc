@@ -595,105 +595,249 @@ Hủy lắng nghe sự thay đổi trạng thái mạng yếu.
 TT.OffNetworkWeakChange();
 ```
 
-### 11. Phím tắt màn hình chính (Shortcut)
+### 11. Phím tắt màn hình chính (Shortcut Revisit)
 
-> **Yêu cầu phiên bản:** client TikTok **≥ 41.0.0**. Bắt buộc guard bằng `CanIUse.AddShortcut` / `CanIUse.GetShortcutMissionReward` (mục 16) trước khi gọi.
->
-> `AddShortcut` kích hoạt **hộp thoại cấp hệ điều hành** để đưa icon game ra màn hình chính. Người dùng có thể bấm Hủy, và Android 8+ chỉ cho phép khi launcher hỗ trợ (thường còn bị giới hạn số lần hỏi). Vì vậy `success == false` **không đồng nghĩa với lỗi kỹ thuật** — đừng hiện thông báo lỗi đỏ cho người chơi.
+Sử dụng cơ chế **Quay lại qua phím tắt màn hình chính (Desktop Shortcut Revisit)** khi game của bạn cần cải thiện tỷ lệ giữ chân (retention), nhiệm vụ hàng ngày (daily tasks), hồi phục thể lực (energy recovery), chuỗi điểm danh đăng nhập (login streaks), tỷ lệ giữ chân ngày đầu (first-day retention) hoặc kéo người chơi quay lại sau các chiến dịch thu hút người dùng (UA). Tính năng này cho phép người chơi thêm lối tắt của Mini Game vào màn hình chính của thiết bị và mở lại game chỉ bằng một cú chạm.
 
-#### 11.1 AddShortcut
-Thêm lối tắt ra màn hình chính (desktop/homescreen).
+Nếu game của bạn chỉ là trải nghiệm chơi một lần (one-time experience) và không phụ thuộc vào phần thưởng quay lại, lưu trữ dữ liệu, hệ thống nhiệm vụ hay vận hành lâu dài, bạn có thể tạm hoãn việc tích hợp tính năng này. Ngoài ra, **Desktop Shortcut** hoàn toàn khác với **Sidebar Revisit (Quay lại qua thanh bên)**, **Thẻ lịch sử đã chơi (History Played Card)** và **Thẻ chơi trực tiếp (Direct Play Card)**. Nguồn lối vào (entry source) và điều kiện kiểm tra thưởng của các tính năng này không được gộp chung hay nhầm lẫn với nhau.
 
-**Chữ ký:**
-```csharp
-public static void AddShortcut(AddShortcutParam param)
+---
+
+#### I. Tổng quan kỹ thuật (Technical Overview)
+
+Luồng cốt lõi bao gồm:
+1. Hướng dẫn người dùng thêm Mini Game vào màn hình chính.
+2. Người dùng thoát game và mở lại game từ icon trên màn hình chính.
+3. Game kiểm tra xem phiên chơi (session) hiện tại có thỏa mãn điều kiện nhận thưởng quay lại qua phím tắt hay không.
+4. Phía logic nghiệp vụ/server game tiến hành trao thưởng theo cơ chế **idempotent** (đảm bảo không trùng lặp khi nhận lại).
+
+![image 4](./Image/TikTokUnitySDK/image4.png)
+
+**Bảng phân chia trách nhiệm:**
+
+| Vai trò (Role) | Trách nhiệm (Responsibility) |
+| :--- | :--- |
+| **Game client** | Hiển thị nút/lối vào thêm shortcut, gọi `addShortcut`, gọi `getShortcutMissionReward` sau khi người dùng vào lại game từ shortcut, và chỉ tiến hành nhận thưởng khi `canReceiveReward == true`. |
+| **TikTok runtime** | Kích hoạt chức năng shortcut, xác định xem session hiện tại có đến từ lối tắt màn hình chính hay không, và trả về kết quả đủ điều kiện nhận thưởng. |
+| **Developer backend / Game logic** | Quản lý sổ cái phần thưởng game và phát thưởng theo cơ chế idempotent. Việc nền tảng xác nhận đủ điều kiện (eligibility) không đồng nghĩa với việc phần thưởng nghiệp vụ đã được trao. |
+
+> **Ranh giới quan trọng:**
+> - Callback `addShortcut.success` **chỉ có nghĩa là luồng thêm shortcut đã được kích hoạt thành công**. Điều này **không có nghĩa là người dùng đã vào lại từ shortcut**, và **tuyệt đối không được trao thưởng ngay tại đây**.
+> - `getShortcutMissionReward` dùng để kiểm tra xem session hiện tại có khớp với điều kiện thưởng khi quay lại qua shortcut hay không.
+> - Tính năng giả lập `scene_shortcut` trong DevTool dùng để mô phỏng "đã khởi chạy từ lối tắt shortcut"; rất hữu ích để debug điều kiện và logic nhận thưởng, nhưng **không thể thay thế việc kiểm thử thực tế đầu-cuối (end-to-end)** từ icon trên màn hình chính của thiết bị thật.
+
+---
+
+#### II. Các bước thực hiện chính (Key Steps)
+
+##### 1. Xác định xem game của bạn có cần thưởng quay lại qua shortcut hay không
+Xác định mục tiêu nghiệp vụ trước: thưởng cho lần thêm đầu tiên, thưởng quay lại hàng ngày, thưởng chuỗi đăng nhập, hồi thể lực, tặng vật phẩm hay kích thích quay lại chơi thường xuyên. Xác định rõ khi nào có thể nhận thưởng, được nhận bao nhiêu lần, chỉ áp dụng cho lần đầu hay lặp lại, và đảm bảo tách biệt với phần thưởng Sidebar Revisit.
+
+##### 2. Kiểm tra tính khả dụng của API và cơ chế dự phòng (Fallback)
+- **Đối với C# / Unity:** `TT.AddShortcut` sẽ trả về thất bại nếu môi trường container không hỗ trợ. Hãy chuẩn bị UI dự phòng và ghi log đầy đủ. Bạn cũng có thể dùng `CanIUse.AddShortcut` để kiểm tra trước và ẩn nút nếu không hỗ trợ.
+- **Đối với JS:** Gọi `TTMinis.game.canIUse('addShortcut')` trước khi hiển thị hoặc gọi tính năng. Nếu không hỗ trợ, ẩn lối vào hoặc nhắc người dùng cập nhật TikTok.
+- *Yêu cầu phiên bản:* Khuyến nghị test trên TikTok client **≥ 41.0.0** (iOS yêu cầu **≥ 41.40**); tính khả dụng thực tế dựa theo kết quả kiểm tra runtime trên client.
+
+```javascript
+// JS Example
+function canShowAddShortcutEntry() {
+  return TTMinis.game.canIUse('addShortcut');
+}
 ```
 
-**`AddShortcutParam`** bao gồm các thuộc tính (callbacks) để xử lý kết quả:
-
-| Field | Kiểu | Mô tả |
-| :--- | :--- | :--- |
-| success | `Action` | Callback khi gọi API thành công và lối tắt được tạo |
-| fail | `Action<ErrorInfo>` | Callback khi thất bại (người dùng từ chối, hệ thống không hỗ trợ, v.v.). Đọc `error.ErrMsg` để lấy chi tiết lỗi |
-| complete | `Action` | Callback luôn được gọi khi tiến trình kết thúc (bất kể thành công hay thất bại) |
-
 ```csharp
-if (!CanIUse.AddShortcut)
-{
-    addShortcutButton.gameObject.SetActive(false);   // TikTok < 41.0.0
-    return;
-}
+// Unity C# Example
+bool isShortcutSupported = CanIUse.AddShortcut && CanIUse.GetShortcutMissionReward;
+addShortcutButton.gameObject.SetActive(isShortcutSupported);
+```
 
+##### 3. Cung cấp lối vào thêm shortcut rõ ràng trong game
+Nội dung văn bản (copywriting) cần giải thích rõ cả **hành động** lẫn **điều kiện nhận thưởng**. Ví dụ: *"Thêm ra Màn hình chính. Mở lại từ icon vào ngày mai để nhận thưởng nhé."* Không được gây hiểu nhầm rằng chỉ cần bấm nút hoặc gọi `addShortcut` thành công là sẽ nhận thưởng ngay.
+
+##### 4. Gọi addShortcut để hướng dẫn người dùng thêm icon
+
+**Phiên bản Unity / C#:**
+```csharp
+// Chữ ký phương thức Callback trực tiếp
+TT.AddShortcut(
+    csCallback: (success) =>
+    {
+        Debug.Log($"Create shortcut: {(success ? "success" : "failed")}");
+        // Thành công ở đây chỉ có nghĩa là luồng tạo shortcut đã được kích hoạt.
+        // Tuyệt đối KHÔNG trao thưởng tại đây!
+    }
+);
+
+// Hoặc gọi thông qua Param struct (nếu dùng giao thức Param)
+/*
 TT.AddShortcut(new AddShortcutParam
 {
-    success = () =>
-    {
-        Debug.Log("Tạo shortcut thành công");
-        CheckShortcutReward();          // xem 11.2
+    success = () => Debug.Log("Kích hoạt tạo shortcut thành công"),
+    fail = (error) => Debug.LogWarning($"Tạo shortcut thất bại: {error.ErrMsg}"),
+    complete = () => Debug.Log("Yêu cầu hoàn tất")
+});
+*/
+```
+
+**Phiên bản JS:**
+```javascript
+function onClickAddShortcut() {
+  if (!TTMinis.game.canIUse('addShortcut')) {
+    // Không hỗ trợ: ẩn lối vào hoặc nhắc người dùng nâng cấp
+    return;
+  }
+
+  TTMinis.game.addShortcut({
+    success: () => {
+      // Hướng dẫn người dùng kiểm tra icon và mở lại từ màn hình chính
     },
-    fail = (error) =>
-    {
-        Debug.Log($"Tạo shortcut thất bại: {error.ErrMsg}");
+    fail: (e) => {
+      console.warn('[addShortcut] fail', e?.errorCode, e?.errMsg);
     },
-    complete = () =>
+  });
+}
+```
+
+##### 5. Kiểm tra phần thưởng sau khi người dùng vào lại từ shortcut
+Việc kiểm tra thưởng **phải diễn ra sau khi người dùng mở lại Mini Game từ icon trên màn hình chính thiết bị**. Tuyệt đối không gọi và trao thưởng ngay trong cùng một session vừa bấm `addShortcut.success`.
+
+**Phiên bản Unity / C#:**
+```csharp
+TT.GetShortcutMissionReward(new GetShortcutMissionRewardParam
+{
+    Success = (result) =>
     {
-        Debug.Log("Tiến trình gọi addShortcut hoàn tất");
+        if (result.CanReceiveReward) // hoặc result.canReceiveReward tùy phiên bản SDK
+        {
+            Debug.Log("Người dùng đủ điều kiện nhận phần thưởng shortcut");
+            // Tiến hành luồng nhận thưởng. Việc phát thưởng bắt buộc phải idempotent!
+        }
+        else
+        {
+            Debug.Log("Người dùng tạm thời chưa đủ điều kiện nhận thưởng shortcut");
+        }
+    },
+    Fail = (error) =>
+    {
+        Debug.LogWarning($"Lấy thông tin thưởng shortcut thất bại: {error.ErrMsg}");
+    },
+    Complete = () =>
+    {
+        Debug.Log("Yêu cầu kiểm tra thưởng shortcut hoàn tất");
     }
 });
 ```
 
-> **Ghi chú:** Không có API kiểm tra trực tiếp xem shortcut đã tồn tại hay chưa. Game nên lưu cờ vào `TT.PlayerPrefs` sau khi vào `success` để tránh hỏi lại người dùng ở những lần mở game sau.
-
-#### 11.2 GetShortcutMissionReward
-Kiểm tra người chơi có đủ điều kiện nhận thưởng từ nhiệm vụ tạo lối tắt hay không.
-
-> **Quan trọng:** Nền tảng TikTok tự xác thực tiến trình. Client **chỉ đọc cờ** `canReceiveReward`, không tự quyết định việc hoàn thành nhiệm vụ.
->
-> - `success` + `canReceiveReward == true` → **đủ điều kiện, tiến hành cấp thưởng**.
-> - `success` + `canReceiveReward == false` → **chưa đủ điều kiện** → **không cấp thưởng**.
-> - `fail` → lỗi hệ thống/mạng (khác với "chưa đủ điều kiện") → thông báo lỗi, có thể cho phép thử lại.
-
-**Chữ ký:** `public static void GetShortcutMissionReward(GetShortcutMissionRewardParam param)`
-
-**`GetShortcutMissionRewardParam`** bao gồm các thuộc tính:
-
-| Field | Kiểu | Mô tả |
-| :--- | :--- | :--- |
-| success | `Action<GetShortcutMissionRewardSuccessResult>` | Kết quả chứa cờ `canReceiveReward` (bool) |
-| fail | `Action<ErrorInfo>` | Đọc `error.ErrMsg` khi gọi API bị lỗi |
-| complete | `Action` | Callback luôn được gọi khi tiến trình gọi API kết thúc |
-
-```csharp
-void CheckShortcutReward()
-{
-    if (!CanIUse.GetShortcutMissionReward) return;
-
-    TT.GetShortcutMissionReward(new GetShortcutMissionRewardParam
-    {
-        success = (result) =>
-        {
-            if (result.canReceiveReward)
-            {
-                Debug.Log("Người dùng có thể nhận phần thưởng lối tắt");
-                // Thực hiện logic cộng thưởng trong game
-                // GrantReward();
-            }
-            else
-            {
-                Debug.Log("Người dùng tạm thời chưa thể nhận phần thưởng");
-            }
-        },
-        fail = (error) =>
-        {
-            Debug.Log($"Lấy thông tin thất bại: {error.ErrMsg}");
-        },
-        complete = () =>
-        {
-            Debug.Log("Yêu cầu kiểm tra thưởng hoàn tất");
-        }
-    });
+**Phiên bản JS:**
+```javascript
+function checkShortcutReward() {
+  TTMinis.game.getShortcutMissionReward({
+    success: (res) => {
+      if (res?.canReceiveReward) {
+        // Thực hiện luồng nhận thưởng. Phát thưởng bắt buộc phải idempotent!
+      } else {
+        // Thường là do session hiện tại không mở từ icon shortcut hoặc chưa đạt điều kiện nhiệm vụ
+      }
+    },
+    fail: (e) => {
+      console.warn('[getShortcutMissionReward] fail', e?.errorCode, e?.errMsg);
+    },
+  });
 }
 ```
+
+##### 6. Trao phần thưởng theo cơ chế Idempotent ở phía nghiệp vụ
+Frontend có thể hiển thị trạng thái phần thưởng, nhưng không được coi là sổ cái lưu trữ cuối cùng. Developer Backend hoặc logic game đáng tin cậy phải ghi nhận trạng thái nhận thưởng với một **idempotency key** duy nhất (ví dụ: `open_id + mission_id + date/count`), đảm bảo việc mở lại nhiều lần, bấm liên tục hoặc chuyển đổi thiết bị không gây ra lỗi phát thưởng trùng lặp.
+
+##### 7. Xác thực riêng biệt giữa chế độ Launch Mode và luồng người dùng thật
+- **Launch Mode (trong DevTool):** Dùng để debug nhanh điều kiện nguồn lối vào và logic nhận thưởng. Khi chọn `scene_shortcut`, DevTool sẽ giả lập *"session hiện tại đến từ lối tắt shortcut"*, do đó cờ `canReceiveReward` có thể trả về `true` ngay lập tức.
+- **Kiểm thử luồng người dùng thật:** Cần thực hiện đầy đủ các bước: Vào game từ lối vào thông thường $\rightarrow$ Bấm Thêm ra màn hình chính $\rightarrow$ Thoát session hiện tại $\rightarrow$ Mở lại từ icon trên màn hình chính $\rightarrow$ Gọi `getShortcutMissionReward` $\rightarrow$ Kiểm tra việc trao thưởng.
+  - Vượt qua kiểm thử ở Launch Mode không đảm bảo luồng thực tế hoạt động trơn tru.
+  - Ngược lại, nếu luồng thực tế thất bại chưa chắc là do logic nhận thưởng sai.
+
+> ⚠️ **Đặc biệt quan trọng:** Shortcut trên màn hình chính luôn mở **phiên bản game đã phát hành chính thức (Online/Production version)**. Nếu Mini Game chưa từng phát hành bản Production nào, shortcut tạo từ bản Preview hoặc bản Local Debugging sẽ **không thể mở được bản Preview/Debug đó từ icon màn hình chính**.
+> - Trong quá trình phát triển & debug: Hãy dùng `scene_shortcut` trên DevTool để xác thực điều kiện lối vào và logic trao thưởng.
+> - Chỉ kiểm thử luồng shortcut thật trên thiết bị sau khi game đã phát hành ít nhất một phiên bản Production.
+
+##### 8. Checklist kiểm tra trước khi phát hành (Release Checklist)
+- [ ] Có phương án xử lý dự phòng (fallback) khi thiết bị không hỗ trợ `addShortcut`.
+- [ ] Các callback lỗi của `addShortcut` và `getShortcutMissionReward` đều được theo dõi (log rõ thông báo lỗi, nền tảng thiết bị, phiên bản TikTok).
+- [ ] Dưới chế độ `scene_shortcut` (DevTool), cờ `canReceiveReward` và logic trao thưởng hoạt động đúng kỳ vọng.
+- [ ] Luồng mở lại từ icon màn hình chính trên thiết bị thật đã được xác thực trên App đã phát hành phiên bản Production.
+- [ ] Các lối vào khác (không phải shortcut) không bị trao nhầm thưởng.
+- [ ] Việc phát thưởng ở phía nghiệp vụ đảm bảo tuyệt đối tính **Idempotent** (chống nhận trùng lặp).
+
+---
+
+#### III. Các câu hỏi thường gặp (FAQ)
+
+**Bảng tra cứu nhanh lỗi:**
+
+| Vị trí lỗi (Where it fails) | Hiện tượng (Symptom) | Kiểm tra trước tiên (Check first) |
+| :--- | :--- | :--- |
+| **Thêm shortcut** | `addShortcut` thất bại hoặc không có hiện tượng gì | Kiểm tra `canIUse`, phiên bản TikTok, quyền hạn hệ thống và callback thất bại (`fail`). |
+| **Kiểm tra thưởng** | `canReceiveReward = false` | Xác nhận người chơi có thực sự vào lại từ icon màn hình chính hay không, hoặc kiểm tra xem đã chọn `scene_shortcut` trong Launch mode chưa. |
+| **Vào lại thực tế** | Bản Preview hoặc bản Local Debug không mở được từ icon màn hình chính sau khi thêm shortcut | Xác nhận xem Mini Game đã phát hành phiên bản Production (chính thức) chưa; lối vào shortcut **chỉ mở bản online**. |
+| **Phát thưởng** | Trùng lặp hoặc thất lạc phần thưởng | Kiểm tra idempotency key của nghiệp vụ, trạng thái nhận thưởng (claim state) và log phía backend. |
+| **Xử lý sự cố nền tảng** | Cùng một đoạn code nhưng hành vi khác nhau giữa các thiết bị | Cung cấp thông tin thiết bị, hệ điều hành (OS), phiên bản TikTok, video ghi lại lối vào, callback và `log_id`. |
+
+---
+
+##### 1. Tại sao `getShortcutMissionReward` vẫn trả về `false` ngay sau khi `addShortcut` thành công?
+`addShortcut` thành công **chỉ có nghĩa là luồng tạo lối tắt đã được kích hoạt**. Điều này không có nghĩa là phiên chơi (session) hiện tại đến từ lối vào shortcut trên màn hình chính.
+
+`getShortcutMissionReward` dùng để kiểm tra xem lần khởi chạy Mini Game này có xuất phát từ icon trên màn hình chính hay không. Luồng đúng là: Gọi `addShortcut` $\rightarrow$ Để người dùng thoát phiên chơi hiện tại $\rightarrow$ Người dùng mở lại Mini Game từ icon trên màn hình chính của thiết bị $\rightarrow$ Lúc này mới gọi `getShortcutMissionReward`. Nếu gọi ngay lập tức trong cùng phiên chơi đó, kết quả sẽ luôn trả về `false`, kể cả đối với tài khoản mới.
+
+##### 2. Tại sao `canReceiveReward` là `true` trong Launch mode nhưng lại là `false` trong luồng người dùng thật?
+Lựa chọn `scene_shortcut` trong DevTool chỉ là một **công cụ giả lập nguồn lối vào** nhằm giúp kiểm tra nhanh điều kiện shortcut và logic nhận thưởng. Nó không đồng nghĩa với việc người dùng đã thực sự hoàn thành việc thêm shortcut, thoát ra và mở lại từ icon màn hình chính.
+
+Hãy kiểm thử luồng thực tế một cách độc lập. Nếu luồng thực tế thất bại, trước tiên hãy kiểm tra xem người dùng có thực sự bấm vào icon trên màn hình chính hay không, phiên bản TikTok có hỗ trợ tính năng này không và phiên chơi có bị tính nhầm là vào từ quét mã QR hoặc lối vào khác hay không.
+
+##### 3. Tại sao tôi không thể mở Mini Game từ icon màn hình chính sau khi thêm từ bản Preview hoặc bản Local Debugging?
+Đây là giới hạn luồng hiện tại của nền tảng: **Phím tắt trên màn hình chính chỉ mở phiên bản đã phát hành chính thức (Online/Production version) của Mini Game**, không mở bản Local Debugging hay bản Preview.
+
+Nếu Mini Game chưa từng phát hành bản Production nào, shortcut tạo từ bản Preview hoặc Local Debug sẽ không thể mở được bản Preview/Debug đó từ icon màn hình chính (có thể gặp hiện tượng không mở được, bị đứng hoặc tải thất bại).
+
+*Giải pháp:* Trong quá trình phát triển/debug, hãy sử dụng `scene_shortcut` trên DevTool để xác thực `getShortcutMissionReward` và logic trao thưởng. Luồng shortcut thật trên thiết bị chỉ nên được kiểm thử sau khi game đã có ít nhất một phiên bản Production. Nếu đã có bản Production, cần nhớ rằng icon sẽ mở bản online, nên không thể dùng nó để kiểm tra các thay đổi code mới của bản preview.
+
+##### 4. Tại sao `canReceiveReward` vẫn là `false` kể cả khi tôi đã mở lại từ icon trên màn hình chính?
+- Trước tiên, hãy xác nhận icon đó được tạo bởi `addShortcut` của chính Mini Game này, chứ không phải bookmark trình duyệt, lối vào cũ hoặc lối vào của ứng dụng khác.
+- Kiểm tra phiên bản ứng dụng TikTok, nền tảng (Android/iOS), khu vực tài khoản và tính khả dụng của tính năng ở thời điểm hiện tại.
+- Kiểm tra xem phần thưởng của nhiệm vụ này đã được nhận trước đó ở phía nghiệp vụ hay chưa. Tính hợp lệ từ nền tảng không thay thế cho sổ cái lưu trữ phần thưởng; trạng thái đã nhận thưởng vẫn cần được quản lý bởi logic nghiệp vụ của bạn.
+
+##### 5. Tôi nên làm gì nếu `addShortcut` thất bại?
+- Gọi `canIUse('addShortcut')` (hoặc `CanIUse.AddShortcut`) trước. Nếu không hỗ trợ, hãy ẩn lối vào hoặc nhắc người dùng nâng cấp ứng dụng.
+- Nếu được hỗ trợ nhưng vẫn thất bại, hãy ghi lại `errorCode`, `errMsg`, nền tảng thiết bị, phiên bản hệ điều hành, phiên bản TikTok và quay video màn hình để tiếp tục chẩn đoán nguyên nhân (do giới hạn hệ thống, người dùng bấm Hủy hay lỗi tính năng từ phía client).
+
+##### 6. Làm thế nào để reset trạng thái `canReceiveReward` để kiểm thử nhiều lần?
+Hiện tại **không có API công khai nào để xóa hoặc reset trạng thái `canReceiveReward` từ phía nền tảng**.
+
+Để kiểm thử nhiều lần:
+- Khi cần thiết, hãy sử dụng tài khoản test hoặc thiết bị khác, và đảm bảo mỗi lần kiểm thử đều khởi chạy Mini Game từ icon màn hình chính thật.
+- Trạng thái nhận thưởng của game cần do backend của bạn quản lý; trong quá trình test, bạn có thể xóa các bản ghi nhận thưởng test trong cơ sở dữ liệu backend của mình.
+
+##### 7. Desktop Shortcut, Sidebar Revisit và History Played Card có thể dùng chung một logic kiểm tra thưởng không?
+**Không khuyến nghị.**
+- **Desktop Shortcut** sử dụng `addShortcut` / `getShortcutMissionReward`.
+- **Sidebar Revisit** sử dụng `startEntranceMission` / `getEntranceMissionReward`.
+- **History Played Card** hoặc **Direct Play Card** thuộc về cơ chế hiển thị quay lại trên Feed.
+
+Nguồn lối vào và API trả thưởng của các cơ chế này hoàn toàn khác nhau. Việc gộp chung chúng thường dẫn đến việc `canReceiveReward = false` hoặc trao sai phần thưởng.
+
+##### 8. Phần thưởng nên được cấp phát từ phía Frontend hay Backend?
+Frontend chỉ nên hiển thị trạng thái phần thưởng, còn việc **phát tài sản/vật phẩm cuối cùng bắt buộc phải do Developer Backend hoặc logic nghiệp vụ đáng tin cậy xử lý**. Người chơi có thể vào lại nhiều lần, bấm liên tục hoặc kích hoạt cùng một nhiệm vụ từ nhiều thiết bị khác nhau. Nếu không có cơ chế **Idempotency (chống trùng lặp)**, xu, thể lực, vật phẩm hoặc quyền lợi có thể bị cấp phát nhiều lần.
+
+##### 9. Cần cung cấp những thông tin gì khi cần phía nền tảng hỗ trợ xử lý sự cố?
+Hãy cung cấp:
+- App ID / Client Key
+- Khu vực của tài khoản test
+- Phiên bản ứng dụng TikTok
+- Nền tảng thiết bị và phiên bản hệ điều hành (OS)
+- Có đang sử dụng `scene_shortcut` hay không
+- Video quay lại toàn bộ luồng vào game thực tế
+- Toàn bộ dữ liệu callback trả về từ `addShortcut` và `getShortcutMissionReward`
+- Thời điểm xảy ra lỗi, `log_id`
+- Log phát thưởng / idempotency log ở phía backend của bạn.
 
 ### 12. Chia sẻ xã hội (Social Share)
 
