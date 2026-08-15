@@ -256,162 +256,297 @@ TT.NavigateToBalance(new TTNavigateToBalanceParam
 });
 ```
 
-### 6. Nhiệm vụ lối vào — Quay lại qua Sidebar (Entrance Mission / Sidebar Revisit)
+### 6. Nhiệm vụ lối vào — Quay lại qua Sidebar (Sidebar Revisit / Entrance Mission)
 
-> **Yêu cầu phiên bản:** client TikTok **≥ 41.0.0**. SDK Unity **không tự kiểm tra** — bắt buộc dùng `CanIUse` (mục 16) trước mỗi lần gọi, nếu không sẽ lỗi runtime trên máy cài bản TikTok cũ.
->
-> **Luồng nghiệp vụ (quan trọng):** `StartEntranceMission` **đưa người chơi rời khỏi game**, nhảy sang sidebar TikTok Profile để hoàn thành bài "hướng dẫn quay lại" — mục đích là chỉ cho họ lối vào game để lần sau mở lại. Game rơi xuống background (`OnHide`). Chỉ khi người chơi quay lại game (`OnShow`) mới nên gọi `GetEntranceMissionReward` để đọc cờ `canReceiveReward`. Gọi `GetEntranceMissionReward` ngay sau `StartEntranceMission` trong cùng frame sẽ luôn nhận `false`. Xem luồng đầy đủ ở mục 6.3.
+Sử dụng cơ chế **Quay lại qua Sidebar (Sidebar Revisit)** khi game của bạn muốn kéo người chơi quay trở lại sau phiên chơi đầu tiên hoặc các phiên chơi trước đó. Tính năng này đặc biệt phù hợp cho phần thưởng hàng ngày (daily rewards), hồi phục thể lực (energy recovery), chuỗi điểm danh đăng nhập (login streaks), nhiệm vụ sự kiện (event missions) và quà tặng trở lại (return gifts): game của bạn hướng dẫn người chơi tới thanh bên **TikTok Profile (Profile Sidebar)**, người chơi mở lại game từ thanh bên đó, và game sẽ kiểm tra xem phiên chơi vào lại này có đủ điều kiện nhận thưởng hay không.
 
-#### 6.1 StartEntranceMission
-Đưa người chơi tới sidebar TikTok Profile để thực hiện nhiệm vụ quay lại.
+Sidebar Revisit **không phải** là kênh thu hút người dùng mới (UA) và **không phải** là API chuyển hướng trong game để mở một Mini Game khác. Tính năng này chỉ giải quyết duy nhất một vấn đề: sau khi người dùng đã biết hoặc đã chơi game của bạn, làm thế nào để họ quay lại thông qua thanh bên TikTok Profile và nhận thưởng sau khi vào lại.
 
-**Chữ ký:** `public static void StartEntranceMission(TTStartEntranceMissionParam param)`
+> **Trước khi tích hợp:** Tính khả dụng phụ thuộc vào phiên bản TikTok client, khu vực tài khoản, tiến độ triển khai của nền tảng (rollout) và thị trường mục tiêu. Hãy đảm bảo tài khoản kiểm thử nằm trong danh sách hỗ trợ, và luôn luôn thêm các bước kiểm tra bằng `canIUse` (hoặc `CanIUse`) cùng logic dự phòng (graceful fallback).
 
-**`TTStartEntranceMissionParam`** kế thừa `ICallback<TTCheckBalanceResult, ErrorInfo, GeneralCallbackResult>`, các field **viết thường**:
+---
 
-| Field | Kiểu | Mô tả |
-| :--- | :--- | :--- |
-| success | `Action<TTCheckBalanceResult>` | Gọi khi đã chuyển hướng thành công. SDK dùng lại kiểu `TTCheckBalanceResult` (chỉ có field `is_sufficient`) — **không phải** thông tin nhiệm vụ, chỉ nên log để chẩn đoán, không dùng làm điều kiện cấp thưởng. |
-| fail | `Action<ErrorInfo>` | Chuyển hướng thất bại; đọc `error.ErrMsg` |
-| complete | `Action<GeneralCallbackResult>` | Luôn được gọi (cả success lẫn fail). Khác JSAPI: bản Unity **có tham số**, không phải `() => void`. |
+#### I. Tổng quan kỹ thuật (Technical Overview)
 
-```csharp
-if (!CanIUse.StartEntranceMission)
-{
-    // Client TikTok < 41.0.0 → ẩn nút nhiệm vụ, không gọi API
-    entranceMissionButton.gameObject.SetActive(false);
-    return;
+Luồng cốt lõi: **"Hướng dẫn sang sidebar $\rightarrow$ Mở lại từ sidebar $\rightarrow$ Xác thực phần thưởng $\rightarrow$ Trao thưởng ở phía nghiệp vụ"**. 
+TikTok cung cấp lối vào trên thanh bên Profile và quản lý trạng thái nhiệm vụ. Mini Game thiết kế thời điểm kích hoạt, gọi API và xử lý trang khi người dùng quay lại. Developer Backend xử lý tính **Idempotency** (chống nhận trùng) và trao tài sản trong game.
+
+**Bảng phân chia trách nhiệm:**
+
+| Vai trò (Role) | Trách nhiệm (Responsibility) |
+| :--- | :--- |
+| **Game client** | Hiển thị lối vào/nút nhận thưởng quay lại, gọi `startEntranceMission`, gọi `getEntranceMissionReward` sau khi người dùng vào lại từ sidebar, và chuyển kết quả đủ điều kiện sang luồng nhận thưởng nghiệp vụ. |
+| **Developer backend** | Duy trì cơ chế idempotent theo người dùng, nhiệm vụ, ngày hoặc số lần; xác thực tính hợp lệ của phần thưởng; trao xu, thể lực, vật phẩm, quyền lợi hoặc tiến độ nhiệm vụ; và ghi log nhận thưởng. |
+| **TikTok platform** | Cung cấp lối vào trên thanh bên TikTok Profile, xử lý việc kích hoạt nhiệm vụ lối vào và trả về kết quả xem phiên chơi hiện tại có đủ điều kiện nhận thưởng hay không. |
+
+> **Ranh giới quan trọng (Boundaries):**
+> - Callback `startEntranceMission` thành công **chỉ có nghĩa là luồng hướng dẫn đã được kích hoạt**. Điều này **không có nghĩa là người dùng đã vào lại từ sidebar**, và **tuyệt đối không được dùng làm tín hiệu để trao thưởng**.
+> - `getEntranceMissionReward` trả về việc phiên chơi hiện tại có khớp với điều kiện thưởng Sidebar Revisit hay không. API này **không tự động cộng tài sản** trong game.
+> - Việc phát thưởng **bắt buộc phải idempotent** ở phía nghiệp vụ/backend; nếu không, thao tác bấm liên tục, mở lại nhiều lần hoặc đăng nhập nhiều thiết bị có thể gây trùng lặp phần thưởng.
+> - Để làm tính năng phím tắt màn hình chính, hãy tham khảo [Mục 11 - Desktop Shortcut Revisit](#11-phím-tắt-màn-hình-chính-shortcut-revisit). Với các thẻ hiển thị trên Feed, hãy tham khảo tài liệu Direct Play Card.
+
+![image 5](./Image/TikTokUnitySDK/image5.png)
+
+---
+
+#### II. Các bước thực hiện chính (Key Steps)
+
+##### 1. Xác nhận tính khả dụng và kịch bản nhận thưởng
+Trước khi triển khai, hãy xác nhận tài khoản test, khu vực, phiên bản TikTok client và tiến độ rollout có hỗ trợ Sidebar Revisit hay không. Sau đó định nghĩa lý do người dùng nên quay lại và họ sẽ nhận được phần thưởng gì:
+1. Xác nhận tài khoản test nằm trong danh sách rollout hỗ trợ.
+2. Xác nhận phiên bản TikTok client đạt yêu cầu (thường là $\ge 41.0.0$).
+3. Thiết kế phần thưởng quay lại (xu hàng ngày, thể lực, tiến độ nhiệm vụ sự kiện, chuỗi đăng nhập hoặc quà trở lại).
+4. Định nghĩa quy tắc Idempotent, ví dụ: `user + mission + date` hoặc `user + campaign + count`.
+
+##### 2. Cung cấp lối vào rõ ràng trong game
+Không chỉ gọi API trong code, hãy cung cấp một nút bấm/giao diện dễ hiểu trong game (ví dụ: *"Đến sidebar nhận thưởng"* hoặc *"Mở lại từ sidebar TikTok để nhận thể lực"*). Nội dung văn bản cần làm rõ rằng người chơi cần mở lại game từ thanh bên TikTok Profile thì phần thưởng mới có thể nhận được.
+
+**Thời điểm khuyến nghị gợi ý người chơi:**
+- Sau màn hướng dẫn tân thủ (Onboarding), để giúp người chơi biết lối vào quay lại game.
+- Khi người chơi hết thể lực, hết xu hoặc hết lượt chơi.
+- Tại trang điểm danh hàng ngày, trang sự kiện hoặc trung tâm phúc lợi.
+
+##### 3. Kiểm tra tính khả dụng của API và cơ chế dự phòng (Fallback)
+Luôn dùng `canIUse` (hoặc `CanIUse`) trước khi gọi API. Nếu không được hỗ trợ, tuyệt đối không gọi ép buộc mà hãy ẩn nút, hiển thị thông báo cập nhật TikTok hoặc hướng dẫn sang lối vào khác.
+
+**Phiên bản JS:**
+```javascript
+const canStartSidebarMission = TTMinis.game.canIUse("startEntranceMission");
+const canCheckSidebarReward = TTMinis.game.canIUse("getEntranceMissionReward");
+
+if (!canStartSidebarMission || !canCheckSidebarReward) {
+  // Ẩn lối vào nhận thưởng sidebar hoặc hiển thị UI dự phòng
 }
+```
 
+**Phiên bản Unity / C#:**
+```csharp
+bool isSidebarSupported = CanIUse.StartEntranceMission && CanIUse.GetEntranceMissionReward;
+sidebarMissionButton.SetActive(isSidebarSupported);
+```
+
+##### 4. Gọi `startEntranceMission` để hướng dẫn người dùng tới sidebar
+Khi người dùng bấm nút trong game, gọi `startEntranceMission`. Callback `success` chỉ mang ý nghĩa là luồng hướng dẫn đã được bật lên, không có nghĩa là người chơi đã hoàn thành việc quay lại.
+
+**Phiên bản JS:**
+```javascript
+function onClickGoSidebarMission() {
+  if (!TTMinis.game.canIUse("startEntranceMission")) {
+    return;
+  }
+
+  TTMinis.game.startEntranceMission({
+    success: () => {
+      // Hướng dẫn người dùng mở lại game từ thanh bên TikTok Profile
+    },
+    fail: (err) => {
+      console.warn("[startEntranceMission] fail", err?.errorCode, err?.errMsg);
+    },
+    complete: () => {
+      console.log("[startEntranceMission] complete");
+    },
+  });
+}
+```
+
+**Phiên bản Unity / C#:**
+```csharp
+// Đối với Unity: Plugin Unity đăng ký bridge API nội bộ startEntranceMission và getEntranceMissionReward
+// tương ứng với minis.startEntranceMission và minis.getEntranceMissionReward.
 TT.StartEntranceMission(new TTStartEntranceMissionParam
 {
     success = (data) =>
     {
-        Debug.Log("Đã chuyển sang sidebar TikTok Profile");
-        // Đánh dấu đang chờ nhiệm vụ để lần OnShow tới sẽ kiểm tra thưởng
-        _waitingEntranceMission = true;
+        Debug.Log("Đã kích hoạt luồng hướng dẫn sang Sidebar TikTok Profile");
+        _waitingEntranceMission = true; // Đánh dấu để kiểm tra ở OnShow khi quay lại
     },
     fail = (error) =>
     {
-        Debug.Log($"Bắt đầu thất bại: {error.ErrMsg}");
+        Debug.LogWarning($"startEntranceMission thất bại: {error.ErrMsg}");
     },
     complete = (res) =>
     {
-        Debug.Log("Yêu cầu hoàn tất");
+        Debug.Log("Yêu cầu startEntranceMission hoàn tất");
     }
 });
 ```
 
-#### 6.2 GetEntranceMissionReward
-Kiểm tra & nhận phần thưởng nhiệm vụ lối vào.
+##### 5. Gọi `getEntranceMissionReward` sau khi người dùng vào lại
+Sau khi người dùng mở lại Mini Game từ thanh bên TikTok Profile, gọi `getEntranceMissionReward` tại thời điểm/trang phù hợp (thường gắn vào sự kiện `OnShow` của vòng đời ứng dụng). **Chỉ khi `canReceiveReward == true`** thì game mới tiến hành luồng nhận thưởng nghiệp vụ.
 
-> **Quan trọng:** Callback `success` trả về đối tượng `TTGetEntranceMissionRewardResult` có field **`canReceiveReward`** (bool). Đây là cờ để quyết định có cấp thưởng cho người chơi hay không — nền tảng TikTok tự xác thực người chơi đã hoàn thành nhiệm vụ (mở game trong TikTok Minis rồi quay lại). Client **không tự quyết định**, chỉ đọc cờ này.
->
-> - `success` + `canReceiveReward == true` → đủ điều kiện → **cấp thưởng**.
-> - `success` + `canReceiveReward == false` → chưa hoàn thành nhiệm vụ → **không cấp**, nhắc người chơi làm tiếp.
-> - `fail` → lỗi hệ thống/mạng (khác với "chưa đủ điều kiện") → báo lỗi, cho thử lại.
->
-> Kết quả **không chứa số lượng thưởng** (ví dụ 💎×100). Con số phần thưởng do nền tảng TikTok cấu hình; cần thống nhất với TikTok xem game tự cộng hay nền tảng tự cộng vào tài khoản.
+**Phiên bản JS:**
+```javascript
+function checkSidebarRevisitReward() {
+  if (!TTMinis.game.getEntranceMissionReward) {
+    return;
+  }
 
-**Chữ ký:** `public static void GetEntranceMissionReward(TTGetEntranceMissionRewardParam param)`
-
-**`TTGetEntranceMissionRewardParam`** kế thừa `ICallback<TTGetEntranceMissionRewardResult, ErrorInfo, GeneralCallbackResult>`, field **viết thường**: `success` / `fail` / `complete`.
-
-```csharp
-if (!CanIUse.GetEntranceMissionReward) return;
-
-TT.GetEntranceMissionReward(new TTGetEntranceMissionRewardParam
-{
-    success = (data) =>
-    {
-        if (data.canReceiveReward)
-        {
-            Debug.Log("Đủ điều kiện — cấp phần thưởng");
-            // GrantReward(); ẩn popup "Get reward"
-        }
-        else
-        {
-            Debug.Log("Chưa hoàn thành nhiệm vụ, chưa thể nhận thưởng");
-            // ShowToast("Hãy mở game trong TikTok Minis rồi quay lại");
-        }
+  TTMinis.game.getEntranceMissionReward({
+    success: ({ canReceiveReward }) => {
+      if (canReceiveReward) {
+        // Gọi backend của bạn để nhận thưởng
+        claimSidebarReward();
+      } else {
+        // Thường do session hiện tại không khởi chạy từ đúng lối vào sidebar,
+        // nhiệm vụ chưa hoàn thành, hoặc tài khoản chưa nằm trong danh sách hỗ trợ.
+      }
     },
-    fail = (error) =>
-    {
-        Debug.Log($"Nhận thất bại (lỗi hệ thống): {error.ErrMsg}");
+    fail: (err) => {
+      console.warn("[getEntranceMissionReward] fail", err?.errorCode, err?.errMsg);
     },
-    complete = (res) =>
-    {
-        Debug.Log("Yêu cầu hoàn tất");
-    }
-});
+  });
+}
 ```
 
-**Cấu trúc kết quả (`TTGetEntranceMissionRewardResult`, kế thừa `GeneralCallbackResult`):**
-
-| Field | Kiểu | Mô tả |
-| :--- | :--- | :--- |
-| canReceiveReward | bool | `true` nếu người chơi đã hoàn thành nhiệm vụ và đủ điều kiện nhận thưởng |
-
-#### 6.3 Luồng hoàn chỉnh (bắt buộc dùng cùng vòng đời ứng dụng)
-
-Vì `StartEntranceMission` đẩy game xuống background, việc kiểm tra thưởng **phải** móc vào `OnShow` của `TT.GetAppLifeCycle()` (mục 7.1):
-
+**Phiên bản Unity / C# (Tích hợp với App LifeCycle):**
 ```csharp
-using TTSDK;
-using UnityEngine;
-
-public class EntranceMissionFlow : MonoBehaviour
+public class SidebarRevisitFlow : MonoBehaviour
 {
-    [SerializeField] private GameObject missionButton;   // nút "Nhận thưởng"
+    [SerializeField] private GameObject missionButton;
     private bool _waitingEntranceMission;
 
-    // Gọi sau khi callback của TT.InitSDK() hoàn tất
     public void Setup()
     {
         bool available = CanIUse.StartEntranceMission && CanIUse.GetEntranceMissionReward;
         missionButton.SetActive(available);
-        if (!available) return;                          // TikTok < 41.0.0 → ẩn hẳn tính năng
+        if (!available) return;
 
-        TT.GetAppLifeCycle().OnShow += _ =>
+        // Lắng nghe khi game quay lại foreground
+        TT.GetAppLifeCycle().OnShow += (options) =>
         {
-            if (!_waitingEntranceMission) return;
-            _waitingEntranceMission = false;
-            CheckReward();                               // người chơi vừa quay lại → kiểm tra cờ
+            if (_waitingEntranceMission)
+            {
+                _waitingEntranceMission = false;
+                CheckSidebarReward();
+            }
         };
     }
 
-    public void OnMissionButtonClicked()
+    public void OnButtonClick()
     {
         TT.StartEntranceMission(new TTStartEntranceMissionParam
         {
             success = _ => _waitingEntranceMission = true,
-            fail = e => Debug.LogWarning($"StartEntranceMission fail: {e.ErrMsg}")
+            fail = e => Debug.LogWarning($"Start fail: {e.ErrMsg}")
         });
     }
 
-    private void CheckReward()
+    private void CheckSidebarReward()
     {
         TT.GetEntranceMissionReward(new TTGetEntranceMissionRewardParam
         {
-            success = data =>
+            success = (data) =>
             {
-                if (data.canReceiveReward) GrantReward();
-                else ShowToast("Hãy mở game từ sidebar TikTok rồi quay lại nhé");
+                if (data.canReceiveReward)
+                {
+                    Debug.Log("Đủ điều kiện — tiến hành cấp phần thưởng qua backend");
+                    // ClaimRewardFromBackend();
+                }
+                else
+                {
+                    Debug.Log("Chưa hoàn thành nhiệm vụ sidebar hoặc session không hợp lệ");
+                }
             },
-            fail = e => ShowToast("Có lỗi xảy ra, thử lại sau")
+            fail = (error) => Debug.LogWarning($"Kiểm tra thưởng thất bại: {error.ErrMsg}")
         });
     }
-
-    private void GrantReward() { /* cộng thưởng + ẩn nút */ }
-    private void ShowToast(string msg) { /* UI của game */ }
 }
 ```
 
-**Bẫy thường gặp:**
-- Gọi `GetEntranceMissionReward` ngay sau `StartEntranceMission` → luôn `false`.
-- Không guard `CanIUse` → crash/no-op im lặng trên client cũ.
-- Coi `fail` là "chưa đủ điều kiện" → sai; `fail` là lỗi hệ thống, "chưa đủ điều kiện" là `success` + `canReceiveReward == false`.
-- Chạy trong Unity Editor: các API này chỉ hoạt động trong container thật, kiểm tra `TT.InContainerEnv` trước khi bật UI khi debug.
+##### 6. Trao thưởng theo cơ chế Idempotent ở phía nghiệp vụ
+Frontend không được tự ý cộng tài sản chỉ dựa vào việc bấm nút hoặc khi `startEntranceMission` thành công. Sau khi `canReceiveReward == true`, frontend gửi request lên Developer Backend, và Backend chỉ trao thưởng sau khi đã kiểm tra tính idempotent theo user, nhiệm vụ, ngày hoặc số lần.
+
+**Ví dụ JS gọi Backend:**
+```javascript
+async function claimSidebarReward() {
+  const result = await fetch("/api/revisit/sidebar/claim", {
+    method: "POST",
+    credentials: "include",
+  }).then((res) => res.json());
+
+  if (result.status === "granted" || result.status === "already_granted") {
+    // Cập nhật lại xu, thể lực, vật phẩm hoặc trạng thái quyền lợi trên UI
+  }
+}
+```
+
+**Ví dụ về Idempotency Keys:**
+- Thưởng hàng ngày: `open_id + sidebar_revisit + yyyyMMdd`
+- Thưởng sự kiện: `open_id + campaign_id + mission_id`
+- Thưởng theo số lần: `open_id + mission_id + claim_count`
+
+##### 7. Xác thực riêng biệt giữa chế độ Launch Mode và luồng người dùng thật
+Chế độ Launch Mode trong DevTool dùng để xác thực nhanh điều kiện lối vào và logic nhận thưởng. Luồng người dùng thật dùng để kiểm tra hướng dẫn, chuyển trang, vào lại và trải nghiệm tổng thể. Không dùng kết quả của phương pháp này để thay thế cho phương pháp kia.
+
+**Bảng so sánh phương pháp kiểm thử:**
+
+| Phương pháp kiểm thử (Validation method) | Cách kiểm tra (How to test) | Nội dung được xác thực (What it validates) |
+| :--- | :--- | :--- |
+| **DevTool Launch mode** | Chọn Sidebar Revisit / `scene_center`, quét mã QR mở game, sau đó gọi trực tiếp `getEntranceMissionReward`. | Điều kiện nguồn lối vào, cờ `canReceiveReward` và logic trao thưởng phía backend. |
+| **Luồng người dùng thật (Real user flow)** | Mở game từ lối vào thông thường, bấm nút nhiệm vụ trong game, gọi `startEntranceMission`, và mở lại từ thanh bên TikTok Profile. | Trải nghiệm hướng dẫn người dùng, thao tác nhảy trang, đường dẫn mở lại, thông báo thưởng và toàn bộ trải nghiệm đầu-cuối. |
+
+---
+
+#### III. Các câu hỏi thường gặp (FAQ)
+
+**Bảng tra cứu nhanh lỗi:**
+
+| Điểm xảy ra lỗi (Failure point) | Hiện tượng phổ biến (Common symptom) | Kiểm tra trước tiên (Check first) |
+| :--- | :--- | :--- |
+| **Tính khả dụng** | Nút bị ẩn, API không có sẵn | Phiên bản TikTok, khu vực tài khoản, phạm vi rollout và kết quả `canIUse`. |
+| **Hướng dẫn lối vào** | `startEntranceMission` thất bại | Kiểm tra tính khả dụng, mã lỗi (error code), rollout tài khoản, phiên bản client. |
+| **Xác thực vào lại** | `canReceiveReward = false` | Xem session có thực sự vào lại từ thanh bên không; Launch mode có chọn `scene_center` chưa; phiên bản client và rollout. |
+| **Phát thưởng** | Trùng thưởng hoặc mất thưởng | Idempotency key ở backend, định danh user, trạng thái nhiệm vụ và log phát thưởng. |
+
+---
+
+##### 1. Tại sao `canReceiveReward` là `true` trong Launch mode nhưng lại là `false` trong luồng người dùng thật?
+Launch mode giả lập một phiên chơi đã được mở từ một lối vào cụ thể. Sau khi chọn Sidebar Revisit / `scene_center`, session hiện tại được coi là đã mở từ thanh bên, do đó `getEntranceMissionReward` có thể trả về `canReceiveReward = true` ngay lập tức.
+
+Luồng người dùng thật lại hoàn toàn khác: Người chơi phải thực sự trải qua chuỗi hành động *"được hướng dẫn từ game sang thanh bên $\rightarrow$ mở lại game từ thanh bên"* thì session hiện tại mới đủ điều kiện.
+
+*Khuyến nghị:* Debug riêng biệt 2 phần — dùng Launch mode để kiểm tra trạng thái lối vào và logic trao thưởng; dùng luồng người dùng thật để kiểm tra trải nghiệm hướng dẫn, chuyển trang và vào lại.
+
+##### 2. Tại sao `canReceiveReward` vẫn là `false` sau khi đã vào lại từ thanh bên?
+- Trước tiên, hãy xác nhận session hiện tại thực sự đến từ thanh bên TikTok Profile, chứ không phải quét mã QR, tìm kiếm, chia sẻ, quảng cáo, phím tắt màn hình chính hay lối vào nào khác.
+- Nếu nguồn lối vào đúng, tiếp tục kiểm tra phiên bản TikTok client, khu vực tài khoản, trạng thái rollout, trạng thái nhiệm vụ và mã lỗi API.
+- Nếu chỉ lỗi trên một nền tảng (ví dụ: Android chạy được nhưng iOS bị lỗi), hãy cung cấp thông tin nền tảng, phiên bản TikTok, phiên bản OS, đường dẫn lối vào và toàn bộ log callback API.
+
+##### 3. Tại sao người chơi không nhận được thưởng ngay sau khi `startEntranceMission` thành công?
+`startEntranceMission` thành công **chỉ có nghĩa là luồng hướng dẫn đã được kích hoạt**, không có nghĩa là người chơi đã hoàn thành việc quay lại từ thanh bên.
+
+Việc xác thực thưởng phải diễn ra sau khi người chơi mở lại game từ thanh bên, và kết quả phải dựa trên `getEntranceMissionReward.canReceiveReward`. Tuyệt đối không phát thưởng trong callback `startEntranceMission.success`.
+
+##### 4. Tôi nên làm gì nếu `startEntranceMission` thất bại?
+- Gọi `canIUse("startEntranceMission")` (hoặc `CanIUse.StartEntranceMission`) trước. Nếu không hỗ trợ, client/tài khoản/môi trường hiện tại chưa hỗ trợ tính năng này $\rightarrow$ Hãy ẩn nút hoặc dùng UI dự phòng.
+- Nếu `canIUse` trả về `true` nhưng gọi vẫn lỗi, hãy ghi lại `errorCode`, `errMsg`, phiên bản app TikTok, phiên bản OS, khu vực tài khoản, nguồn khởi chạy và các bước tái hiện lỗi để tiếp tục chẩn đoán.
+
+##### 5. Phần thưởng nên do Frontend hay Backend cấp phát?
+Frontend chỉ hiển thị kết quả phần thưởng, việc xác thực điều kiện và **cộng tài sản bắt buộc phải do Developer Backend xử lý**. Người chơi có thể bấm nhiều lần, vào lại nhiều lần, chuyển đổi trạng thái app hoặc kích hoạt nhiệm vụ từ nhiều thiết bị. Nếu không có cơ chế idempotent ở backend, tài sản trong game có thể bị cấp phát trùng lặp.
+
+##### 6. Sidebar Revisit khác gì so với Desktop Shortcut hay History Played Card?
+Tất cả đều là các kênh kéo người chơi quay lại, nhưng **nguồn lối vào và API xác thực hoàn toàn khác nhau**:
+- **Sidebar Revisit:** Người chơi vào lại từ thanh bên TikTok Profile, dùng `startEntranceMission` và `getEntranceMissionReward`.
+- **Desktop Shortcut Revisit:** Người chơi vào lại từ icon trên màn hình chính, dùng `addShortcut` và `getShortcutMissionReward`.
+- **Direct Play Card / History Played Card:** Khả năng hiển thị quay lại trên trang Feed TikTok. Không tái sử dụng API xác thực của sidebar cho tính năng này.
+Tuyệt đối không dùng chung launch mode, tham số lối vào hoặc API nhận thưởng giữa các cơ chế này.
+
+##### 7. Tại sao cùng một đoạn code lại chạy được trên Android nhưng không chạy được trên iOS?
+Đây thường không phải lỗi code frontend đơn thuần. Hãy tiếp tục kiểm tra phiên bản TikTok trên iOS, phiên bản iOS, khu vực tài khoản, trạng thái rollout, các trường tham số lối vào và việc client đã thích ứng với giao diện thanh bên mới nhất hay chưa.
+
+Khi cần hỗ trợ, hãy cung cấp rõ nền tảng, phiên bản TikTok, phiên bản OS, xác nhận session có đúng từ sidebar không, toàn bộ response từ `getEntranceMissionReward`, thời điểm lỗi và `log_id`. Việc chỉ báo "Android được, iOS không được" là không đủ để chẩn đoán.
+
+##### 8. Cần cung cấp những thông tin gì khi cần phía nền tảng hỗ trợ xử lý sự cố?
+Cung cấp đầy đủ các thông tin sau:
+- App ID / Client Key.
+- Khu vực tài khoản test, phiên bản ứng dụng TikTok, nền tảng thiết bị và phiên bản OS.
+- Phương pháp kiểm thử: DevTool Launch mode hay luồng người dùng thật.
+- Nếu dùng Launch mode, có chọn `scene_center` hay không.
+- Toàn bộ dữ liệu callback của `startEntranceMission` và `getEntranceMissionReward` (bao gồm `errorCode`, `errMsg`, `canReceiveReward`).
+- Ảnh chụp hoặc video màn hình thể hiện lối vào khởi chạy game.
+- Request nhận thưởng và log idempotent ở phía backend của bạn.
+
+---
 
 #### 6.4 ShowRevisitGuide — cơ chế quay lại thứ hai (chưa gọi được)
 
