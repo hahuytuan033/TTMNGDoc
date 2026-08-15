@@ -24,7 +24,7 @@ Giới hạn kích thước tải lên của gói game Unity là 60M. Để đ�
 **Beta:** Trong thời gian thử nghiệm nội bộ, SDK dưới đây sẽ được cập nhật thường xuyên, vui lòng đảm bảo bạn đang dùng phiên bản mới nhất!!!
 
 Unity SDK package (import SDK dưới đây vào project Unity của bạn):
-[com.tiktok.minigame@1.0.37-Beta.unitypackage](./Package/com.tiktok.minigame@1.0.37-Beta.unitypackage)
+[com.tiktok.minigame@1.1.5-Release.unitypackage](./Package/com.tiktok.minigame@1.1.5-Release.unitypackage)
 
 **Release:**
 
