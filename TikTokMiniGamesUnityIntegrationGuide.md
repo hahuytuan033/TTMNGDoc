@@ -22,7 +22,7 @@ Tuyệt đối không tải lên (upload) trực tiếp project Unity hay thư m
 ## II. Các bước chính (Key Steps)
 
 ### 1. Xác nhận yêu cầu về project và phiên bản
-![Image 3](./Image/TikTokMiniGamesUnityIntegrationGuide/image3.png)
+![Technical Overview 3](./Image/TikTokMiniGamesUnityIntegrationGuide/image3.png)
 
 - Đảm bảo rằng project có thể build ra bản WebGL ổn định và giữ nguyên một cấu hình build Unity có thể tái tạo (reproducible).
 - Hướng dẫn này cung cấp các chỉ dẫn build ổn định cho Unity 2021 và Unity 2022. Unity 6 chưa phải là phiên bản tương thích cơ sở được ghi nhận trong tài liệu. Nếu bạn cần sử dụng Unity 6, hãy xác thực bản build thử nghiệm trên thiết bị thực trước, và cung cấp gói (package) cùng log khi báo cáo lỗi.
