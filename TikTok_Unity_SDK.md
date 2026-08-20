@@ -1121,86 +1121,205 @@ public class AdManager : MonoBehaviour
 }
 ```
 
-#### 13.2 CreateInterstitialAd
-Tạo quảng cáo video xen kẽ (Interstitial Ad).
-```csharp
-// Tạo thực thể quảng cáo
-var interstitialAd = TT.CreateInterstitialAd(new CreateInterstitialAdParam
-{
-    InterstitialAdId = "your_interstitial_ad_id"  // Lấy từ developer backend
-});
+#### 13.2 TikTok Label Ads (HS `showAdsRemote`) — Module
 
-// Lắng nghe sự kiện đóng
-interstitialAd.OnClose += () =>
-{
-    Debug.Log("Quảng cáo xen kẽ đã đóng");
-    // Logic xử lý sau khi quảng cáo đóng
-};
+Module **quảng cáo theo place label** dùng chung cho các game TikTok Mini Game (WebGL). Mô hình: game
+**chỉ gửi một label** (vd `rw_run_revive`), còn **backend console HS**
+giữ hết mapping `label → Ad ID`, cooldown, frequency cap, và cả việc quyết định loại ad (rewarded /
+interstitial). Client **không** hard-code Ad ID, **không** tự đếm cooldown.
 
-// Lắng nghe sự kiện lỗi
-interstitialAd.OnError += (errorCode, errorMessage) =>
-{
-    Debug.Log($"Lỗi quảng cáo xen kẽ: {errorCode}, {errorMessage}");
-};
+> **Kiểu tích hợp: ads-only bolt-on.** Bộ này CHỈ lo **ads**, chạy trên HS **JS SDK 1.0.5**.
+> Auth / IAP / CloudSave vẫn ở bản HS **C# 1.0.4** (`HSTikTokIntegration.cs`) — KHÔNG đụng tới ở đây.
+> Hệ quả: có **2 phiên login HS song song** (JS cho ads + C# cho auth/IAP) — caveat đã biết, chấp nhận.
 
-// Hiển thị quảng cáo
-interstitialAd.Show();
+---
+
+##### 1. Luồng dữ liệu
+
+```
+Call site trong game   (using AmobearTTMNG.Ads;)
+  → TikTokAds.ShowVideoReward(cb, label)  /  ShowInterstitial(cb, label)       [TikTok/Runtime/TikTokAds.cs]
+  → TTAdsProvider.ShowRewarded/ShowInterstitial(label, ...)                    [TikTok/Runtime/TTAdsProvider.cs]
+  → HSBridge.ShowAdsRemote(label, onResult)                                    [TikTok/Runtime/HSBridge.cs]
+  → HS_ShowAdsRemote(reqId, label)   (DllImport __Internal)                    [TikTok/WebGL/HSBridge.jslib]
+  → HSTikTokSDK.ads.showAdsRemote(label)                                       [JS SDK 1.0.5 nhúng trong game.js]
+  → BACKEND CONSOLE HS: label → Ad ID / cooldown / frequency cap
 ```
 
-**Lưu ý:**
-- Không được phép hiển thị quảng cáo xen kẽ trong vòng 15 giây đầu tiên kể từ khi module quảng cáo khởi động (việc gọi bất kỳ API quảng cáo nào cũng sẽ khởi động module quảng cáo).
-- Khoảng cách giữa 2 lần hiển thị quảng cáo xen kẽ không được ít hơn 30 giây.
-- Quảng cáo xen kẽ hỗ trợ nhiều thực thể (multi-instance), có thể tạo nhiều thực thể ở các ngữ cảnh (scene) khác nhau.
-- Mỗi thực thể quảng cáo xen kẽ chỉ hỗ trợ hiển thị một lần. Dù xảy ra lỗi tải (load error) hay hiển thị thành công, thực thể đều tự động bị hủy (destroy), lần sau phải tạo lại.
-- Có thể gọi hàm `Destroy()` để tự hủy bỏ thực thể quảng cáo.
+Bảng placements (`label → Ad ID`) được backend gửi về **lúc login JS** (trong `hs-bootstrap.js.txt`).
 
-**Thực hành tốt nhất (Best Practice):**
+---
+
+##### 2. Các file trong thư mục
+
+Tất cả trong `namespace AmobearTTMNG.Ads` → dùng `using AmobearTTMNG.Ads;` ở call site (tránh trùng tên khi bê sang game khác).
+
+| File | Vai trò |
+|---|---|
+| `Runtime/TikTokAds.cs` | **Facade DUY NHẤT game gọi** (static). Delegate sang TTAdsProvider/HSBridge, giả lập Editor. |
+| `Runtime/HSBridge.cs` | Cầu C# ↔ JS. `ShowAdsRemote(label)`, theo dõi login, watchdog timeout. Bản trim chỉ ads. |
+| `Runtime/TTAdsProvider.cs` | Bọc rewarded/interstitial theo label; giải mã error code của backend. |
+| `WebGL/HSBridge.jslib` | Hàm JS `HS_ShowAdsRemote` / `HS_RequestStatus` / `HS_BridgeReady` gọi vào SDK. |
+| `JS/hs-tiktok-sdk.min.js.txt` | HS JS SDK 1.0.5 (file vendor, có module ads). |
+| `JS/hs-bootstrap.js.txt` | Init + login JS SDK. **Chỗ điền Game ID / SDK Key**. |
+| `Editor/TikTokTemplateBuilder.cs` | Menu Unity sinh `CustomizeTemplate/game.js` có nhúng SDK + bootstrap. |
+
+Ngoài thư mục này (phần đặc thù game — tạo mới cho mỗi game, đặt ở **bất kỳ đâu** trong `Assets/`):
+- `AdPlacement.cs` — bộ place label của game (tiền tố `rw_`/`it_`), trong `namespace AmobearTTMNG.Ads`.
+  Scaffold: `_Examples/AdPlacement.example.txt`.
+- `TikTokAdsBootstrap.cs` — **(TÙY CHỌN)** glue nối `TikTokAds.IsAdsActive`/`OnRewardGranted` vào type
+  của game (remove-ads / analytics). Module đã tự init nên không có glue vẫn chạy.
+  Scaffold: `_Examples/TikTokAdsBootstrap.example.txt`.
+
+---
+
+##### 3. Cách gọi quảng cáo trong game code
+
+Thêm `using AmobearTTMNG.Ads;`, gọi `TikTokAds` (static) với một hằng trong `AdPlacement` — **đừng** gõ chuỗi thẳng:
+
 ```csharp
-public class AdManager : MonoBehaviour
+using AmobearTTMNG.Ads;
+
+// Rewarded: callback CHỈ chạy khi người chơi xem HẾT ad.
+TikTokAds.ShowVideoReward(() => {
+    // trao thưởng ở đây
+}, AdPlacement.rw_run_revive);
+
+// Interstitial: callback LUÔN chạy đúng một lần (kể cả khi bị bỏ qua / hết cooldown / đã mua Remove Ads).
+// Dùng để tiếp tục luồng game (đổi scene, về đảo...).
+TikTokAds.ShowInterstitial(() => {
+    // chạy tiếp luồng game ở đây
+}, AdPlacement.it_run_win);
+```
+
+Ghi nhớ giao kèo:
+- **Rewarded** → chỉ trao thưởng khi xem hết. Không có ad / tắt sớm / lỗi → bắn `TikTokAds.OnRewardUnavailable`.
+- **Interstitial** → callback **luôn** chạy một lần (không kẹt luồng game).
+- **Không có** banner / MREC / app-open trên TikTok — HS SDK chỉ có `showAdsRemote`.
+- `LoadAds` / `PreCachedAds` / `Prewarm*` / `RequestLoadReward` là **no-op** (SDK tự lo waterfall, không preload).
+- `IsRewardReady` / `IsReadyInter` luôn trả `true` (readiness do backend quyết định lúc show).
+
+###### Thêm một vị trí quảng cáo mới
+1. Thêm một hằng `const string` vào `AdPlacement.cs` (đặt tiền tố `rw_` hoặc `it_`).
+2. Gọi `TikTokAds.ShowVideoReward/ShowInterstitial(..., AdPlacement.<label_mới>)` ở call site (`using AmobearTTMNG.Ads;`).
+3. **Map label mới trên console HS** (xem mục 4). Chưa map = im lặng không có ad.
+
+---
+
+##### 4. Thiết lập & build (checklist)
+
+1. **Điền credentials** trong `JS/hs-bootstrap.js.txt`: `HS_GAME_ID` và `HS_SDK_KEY` của **đúng app
+   TikTok của game** (nếu game đã dùng bản C# HS SDK 1.0.4 thì lấy đúng cặp đó — cùng app/backend HS).
+2. **Chạy menu Unity `Tools/TikTok/5. Tạo-cập nhật CustomizeTemplate`** để nhúng SDK + bootstrap vào
+   `Assets/Plugins/com.tiktok.minigame/CustomizeTemplate/game.js`.
+   > ⚠️ Sửa `hs-bootstrap.js.txt` hoặc `hs-tiktok-sdk.min.js.txt` xong **phải chạy lại menu này**. Đừng
+   > sửa tay `game.js` đã sinh — lần regenerate sau sẽ mất. Menu `6.` xoá CustomizeTemplate (quay về mặc định).
+3. **Kiểm import settings** của `WebGL/HSBridge.jslib`: Platform **WebGL** phải được tick.
+4. **Map đủ 19 label** trên console HS (cả `rw_*` lẫn `it_*`) → Ad ID + cooldown + frequency cap. Xin bên
+   vận hành map một lần cho đủ.
+5. **Whitelist domain** backend HS trong TikTok Developer Portal (nếu login lỗi `21100` / "url not in domain list").
+6. **Build WebGL** cho TikTok container.
+
+---
+
+##### 5. Kiểm thử & chẩn đoán
+
+Trên TikTok DevTool (console JS) khi mở game:
+- `[HSBridge] init ok ...` → SDK nạp ok.
+- `[HSBridge] login: ok` → đã login, bảng placements đã tải.
+- Bấm nút ads → `[HSBridge] showAdsRemote("<label>") ...` rồi kết quả `success/completed`.
+
+Editor / non-WebGL: bridge chạy **chế độ giả lập** — mọi ad coi như "xem hết", callback chạy ngay
+(test được luồng gameplay không cần máy thật).
+
+###### Bảng lỗi hay gặp (log từ `TTAdsProvider`)
+| Thông báo | Nghĩa / cách xử lý |
+|---|---|
+| `AD_NO_REMOTE_CONFIG` | Label **chưa map** sang Ad ID trên console → báo bên vận hành ads. |
+| `AD_WATERFALL_EMPTY` | Tạm thời không có ad / đang cooldown → thử lại sau. |
+| `AD_FREQUENCY_CAP` | Chạm frequency cap của placement (cấu hình cooldown backend đang chặn). |
+| `AD_INVALID_REQUEST` | Label rỗng / sai định dạng. |
+| `11004` | Hết hạn mức quảng cáo, thử lại sau — **không** phải lỗi cấu hình. |
+| Login treo > 20s | Chưa whitelist domain (21100), bootstrap không chạy, hoặc backend không phản hồi. |
+
+---
+
+##### 6. Lưu ý nè
+
+- **KHÔNG** cần phải hard-code Ad ID trong client — mapping đã nằm ở phía backend. Client chỉ khai báo label.
+- **KHÔNG** đưa IAP/Auth/CloudSave qua bộ này — chúng ở bản C# 1.0.4. Bootstrap ở đây **không** đăng ký
+  `registerRewardHandler` (reward IAP do C# lo), tránh cấp thưởng hai lần.
+- Caveat **2 phiên login HS**: sau khi build, test mua IAP (vd `no_ads_pack`) để chắc quà vẫn cấp đúng
+  **một lần** (`HSTikTokIntegration` đã có hàng rào chống bị trùng lặp theo `productId`).
+- Đổi rewarded ↔ interstitial hay tần suất → chỉnh **trên console**, không cần build lại client.
+
+---
+
+##### 7. Các bước thực hiện lần lượt
+
+Folder `TikTok/` là module tự chứa (namespace `AmobearTTMNG.Ads`). Bê nguyên sang game khác:
+1. Copy cả folder `Assets/TikTok/`.
+2. Sửa `JS/hs-bootstrap.js.txt` → `HS_GAME_ID` / `HS_SDK_KEY` của game mới; chạy menu `Tools/Tuanvhh/5Create - Update CustomizeTemplate (HS SDK).`.
+3. Tạo `AdPlacement.cs` → bộ label của game mới; map chúng trên console HS của game mới.
+```csharp
+namespace AmobearTTMNG.Ads
 {
-    private TTInterstitialAd _interstitialAd;
-    private float _lastShowTime = 0f;
-    private const float MIN_INTERVAL = 30f; // Khoảng cách tối thiểu 30 giây
+	//Place label quảng cáo của game. Mỗi label gửi thẳng cho TikTokAds.ShowVideoReward/ShowInterstitial,
+	//backend console HS quyết định Ad ID / cooldown / frequency cap / loại ad
+	
+	public static class AdPlacement
+	{
+		// ---- Rewarded video (tiền tố rw_) ----
+		public const string rw_revive       = "rw_revive";        // vd: xem ads để hồi sinh
+		public const string rw_double_reward = "rw_double_reward"; // vd: x2 phần thưởng
+		public const string rw_free_gift    = "rw_free_gift";     // vd: nhận quà miễn phí
+		public const string rw_unlock_skin  = "rw_unlock_skin";   // vd: mở khóa skin
 
-    public void ShowInterstitialAd()
-    {
-        // Kiểm tra khoảng cách thời gian
-        if (Time.time - _lastShowTime < MIN_INTERVAL)
-        {
-            Debug.Log($"Khoảng cách với lần hiển thị trước chưa đủ {MIN_INTERVAL} giây, vui lòng thử lại sau");
-            return;
-        }
+		// ---- Interstitial (tiền tố it_) ----
+		public const string it_level_win  = "it_level_win";   // vd: sau khi thắng màn
+		public const string it_level_lose = "it_level_lose";  // vd: sau khi thua màn
+		public const string it_ads_break  = "it_ads_break";   // vd: ads break định kỳ
 
-        // Tạo thực thể quảng cáo xen kẽ mới
-        _interstitialAd = TT.CreateInterstitialAd(new CreateInterstitialAdParam
-        {
-            InterstitialAdId = "your_interstitial_ad_id"
-        });
-
-        _interstitialAd.OnClose += () =>
-        {
-            Debug.Log("Quảng cáo xen kẽ đã đóng");
-            _lastShowTime = Time.time;
-            _interstitialAd = null;
-        };
-
-        _interstitialAd.OnError += (code, msg) =>
-        {
-            Debug.LogError($"Lỗi quảng cáo xen kẽ: {code}, {msg}");
-            _interstitialAd = null;
-        };
-
-        // Hiển thị quảng cáo
-        _interstitialAd.Show();
-    }
-
-    void OnDestroy()
-    {
-        // Dọn dẹp tài nguyên
-        _interstitialAd?.Destroy();
-    }
+		// TODO: thêm/bớt label cho đúng game. Nhớ map trên console HS.
+	}
 }
 ```
+4. **(TÙY CHỌN)** Tạo file glue `TikTokAdsBootstrap.cs` — đặt ở **BẤT KỲ đâu** trong `Assets/` (không cần
+   thư mục cố định; mọi script trong Assets vào Assembly-CSharp). Chỉ cần khi muốn **remove-ads gating**
+   hoặc **analytics**: gán `TikTokAds.IsAdsActive` và `TikTokAds.OnRewardGranted`. Module đã **tự init**
+   nên KHÔNG cần gọi `Initialize()`.
+```csharp
+using AmobearTTMNG.Ads;
+using UnityEngine;
+
+public static class TikTokAdsBootstrap
+{
+	[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+	private static void Init()
+	{
+		// (1) Remove Ads: không chiếu interstitial cho người đã mua. Đánh giá lazy lúc show nên an toàn.
+		//     Đổi điều kiện cho đúng cờ remove-ads của game (bỏ hẳn dòng này nếu game không có Remove Ads).
+		TikTokAds.IsAdsActive = () =>
+			/* <YourProfile> */ Profile.Instance == null || !Profile.Instance.IsRemmoveAds;
+
+		// (2) Rewarded xem hết -> log analytics theo label. Đổi sang hàm analytics của game
+		//     (chữ ký void (string label)). Trừ trước khi cộng để tránh đăng ký trùng.
+		TikTokAds.OnRewardGranted -= /* <YourAnalytics> */ Analytic.RewardVideoClaimed;
+		TikTokAds.OnRewardGranted += /* <YourAnalytics> */ Analytic.RewardVideoClaimed;
+
+		// KHÔNG cần gọi TikTokAds.Initialize() — module đã tự init lúc khởi động.
+	}
+}
+```
+5. Call site game mới: `using AmobearTTMNG.Ads;` rồi gọi `TikTokAds.ShowVideoReward/ShowInterstitial(...)`.
+6. Điều kiện môi trường: game đích đã cài TTSDK (`Assets/Plugins/com.tiktok.minigame/DefaultTemplate/game.js`
+   có `function main() {`); tick WebGL cho `HSBridge.jslib`.
+
+Nhờ namespace `AmobearTTMNG.Ads`, các type (`TikTokAds`/`HSBridge`/`TTAdsProvider`/`AdPlacement`) không đụng type
+cùng tên sẵn có của game đích.
+- Và hãy nói **I luv TikTok** trước khi vào code TikTokMiniGame 
+
+
 
 ### 14. Báo cáo sự kiện (Event Reporting)
 
@@ -1544,7 +1663,7 @@ void ShareContent()
 | ShareAppMessage | Chia sẻ tin nhắn |
 | **Quảng cáo** | |
 | CreateRewardedVideoAd | Quảng cáo video có phần thưởng |
-| CreateInterstitialAd | Quảng cáo xen kẽ |
+| TikTokAds (HS showAdsRemote) | Module quảng cáo theo place label |
 
 ### Lưu ý quan trọng
 1. **Ưu tiên khởi tạo:** Tất cả các API bắt buộc phải được gọi sau khi callback của `TT.InitSDK()` hoàn tất.

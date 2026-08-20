@@ -1,0 +1,101 @@
+// ─────────────────────────────────────────────────────────────────────────────
+//  HS TikTok SDK — bootstrap (chạy trong game.js, TRƯỚC khi Unity khởi động)
+//  BẢN NÀY CHỈ LO ADS (ads-only bolt-on).
+//
+//  File này KHÔNG tự chạy. "Tools/TikTok/5. Tạo-cập nhật CustomizeTemplate" sẽ nhúng
+//  nó (cùng hs-tiktok-sdk.min.js.txt) vào CustomizeTemplate/game.js. Sửa ở đây rồi
+//  chạy lại menu đó — đừng sửa thẳng game.js đã sinh ra, lần regenerate sau sẽ mất.
+//
+//  VÌ SAO PHẢI CHẠY SỚM THẾ NÀY: doc HS ghi "Put this inside main(), not at the top of
+//  the file — it crashes on device." Mà lúc main() chạy thì Unity còn chưa load xong,
+//  chưa có GameObject nào để SendMessage tới. Nên event phải được XẾP HÀNG lại, đợi phía
+//  C# báo sẵn sàng rồi mới xả ra — đó là việc của object bridge bên dưới.
+//
+//  LƯU Ý (ads-only bolt-on): nếu game dùng bản C# HS SDK 1.0.4 cho Auth/IAP/CloudSave
+//  (HSTikTokIntegration) thì bootstrap này KHÔNG đụng tới — chỉ init + login bản JS để tải bảng
+//  placements cho ads. Vì vậy KHÔNG đăng ký registerRewardHandler ở đây (reward IAP do C# lo).
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ⚠️ ĐIỀN CREDENTIALS CỦA GAME NÀY (mỗi game một cặp Game ID / SDK Key riêng — KHÔNG dùng lại của game khác).
+//    Lấy từ backend/console HS cho ĐÚNG app TikTok của game. Điền xong chạy menu Tools/TikTok/5.
+//    Hai giá trị này nằm trong build client nên coi như công khai — đó là thiết kế của SDK.
+var HS_GAME_ID = '<PASTE_HS_GAME_ID>';
+var HS_SDK_KEY = '<PASTE_HS_SDK_KEY>';
+
+(function () {
+  // Bridge dùng chung giữa bootstrap này và HSBridge.jslib. Gắn lên GameGlobal vì đó
+  // là global duy nhất chắc chắn sống xuyên suốt trong container TikTok.
+  //
+  // TẠO TRƯỚC MỌI THỨ, kể cả trước khi kiểm tra SDK có tồn tại không: nếu SDK hỏng mà
+  // __HSBridge cũng không có thì phía C# gọi sang sẽ rơi vào hư không, không callback,
+  // và nút bấm trong game kẹt vĩnh viễn. Có bridge thì ít nhất còn báo lỗi về được.
+  var B = {
+    ready: false,   // phía C# đã đăng ký xong chưa
+    queue: [],      // event xảy ra trước khi C# sẵn sàng
+    send: null,     // jslib gán vào: function(jsonString)
+
+    emit: function (evt) {
+      var json;
+      try {
+        json = JSON.stringify(evt);
+      } catch (e) {
+        console.error('[HSBridge] Không serialize được event:', e);
+        return;
+      }
+      if (this.ready && this.send) this.send(json);
+      else this.queue.push(json);
+    },
+
+    // jslib gọi khi C# báo sẵn sàng.
+    flush: function () {
+      if (!this.ready || !this.send) return;
+      var q = this.queue;
+      this.queue = [];
+      for (var i = 0; i < q.length; i++) this.send(q[i]);
+    }
+  };
+
+  GameGlobal.__HSBridge = B;
+
+  if (typeof HSTikTokSDK === 'undefined') {
+    console.error('[HSBridge] KHÔNG tìm thấy HSTikTokSDK. Khối nhúng SDK trong game.js hỏng hoặc thiếu — ' +
+                  'chạy lại "Tools/TikTok/5. Tạo-cập nhật CustomizeTemplate" rồi build lại.');
+    // Báo về C# để game biết mà tắt ads thay vì đứng chờ.
+    B.emit({ kind: 'login', success: false, error: 'HSTikTokSDK undefined (SDK không nạp được)' });
+    return;
+  }
+
+  if (!HS_GAME_ID || !HS_SDK_KEY || HS_GAME_ID.indexOf('<') === 0) {
+    console.error('[HSBridge] Chưa điền HS_GAME_ID / HS_SDK_KEY trong hs-bootstrap.js.txt.');
+    B.emit({ kind: 'login', success: false, error: 'thiếu gameId/sdkKey' });
+    return;
+  }
+
+  try {
+    HSTikTokSDK.init({ gameId: HS_GAME_ID, sdkKey: HS_SDK_KEY });
+    console.log('[HSBridge] init ok. SDK v' + HSTikTokSDK.version +
+                ' platform=' + HSTikTokSDK.platform + ' host=' + HSTikTokSDK.hostName);
+  } catch (e) {
+    console.error('[HSBridge] init ném exception:', e);
+    B.emit({ kind: 'login', success: false, error: 'init lỗi: ' + String(e) });
+    return;
+  }
+
+  // Login sớm: chính lúc login SDK mới tải về bảng placements (mapping place label -> Ad ID).
+  // Nothing throws — SDK luôn trả result object, nhưng vẫn catch phòng lỗi mạng tầng dưới.
+  try {
+    HSTikTokSDK.auth.login()
+      .then(function (r) {
+        var ok = !!(r && r.success);
+        console.log('[HSBridge] login: ' + (ok ? 'ok' : 'fail ' + ((r && r.error) || '')));
+        B.emit({ kind: 'login', success: ok, error: (r && r.error) || '' });
+      })
+      .catch(function (e) {
+        console.error('[HSBridge] login ném exception:', e);
+        B.emit({ kind: 'login', success: false, error: String(e) });
+      });
+  } catch (e) {
+    console.error('[HSBridge] login ném exception đồng bộ:', e);
+    B.emit({ kind: 'login', success: false, error: String(e) });
+  }
+})();
