@@ -1213,9 +1213,9 @@ Ghi nhớ giao kèo:
 2. **Chạy menu Unity `Tools/TikTok/5. Tạo-cập nhật CustomizeTemplate`** để nhúng SDK + bootstrap vào
    `Assets/Plugins/com.tiktok.minigame/CustomizeTemplate/game.js`.
    > ⚠️ Sửa `hs-bootstrap.js.txt` hoặc `hs-tiktok-sdk.min.js.txt` xong **phải chạy lại menu này**. Đừng
-   > sửa tay `game.js` đã sinh — lần regenerate sau sẽ mất. Menu `6.` xoá CustomizeTemplate (quay về mặc định).
+   > sửa tay `game.js` đã sinh — lần regenerate sau sẽ mất. Menu Delete CustomizeTemplate (back to default).
 3. **Kiểm import settings** của `WebGL/HSBridge.jslib`: Platform **WebGL** phải được tick.
-4. **Map đủ 19 label** trên console HS (cả `rw_*` lẫn `it_*`) → Ad ID + cooldown + frequency cap. Xin bên
+4. **Map đủ các label** trên console HS (cả `rw_*` lẫn `it_*`) → Ad ID + cooldown + frequency cap. Xin bên
    vận hành map một lần cho đủ.
 5. **Whitelist domain** backend HS trong TikTok Developer Portal (nếu login lỗi `21100` / "url not in domain list").
 6. **Build WebGL** cho TikTok container.
