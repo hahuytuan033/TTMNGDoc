@@ -83,58 +83,58 @@ namespace TikTokMiniGameDemo
         /// </summary>
         private void BuildFeatureButtons()
         {
-            AddCategory("系统 / System",
+            AddCategory("System",
                 ("System Info", DoGetSystemInfo),
                 ("Container Version", DoContainerVersion),
                 ("Launch Options", DoLaunchOptions),
                 ("Clean File Cache", DoCleanFileCache));
 
-            AddCategory("生命周期 / Lifecycle",
+            AddCategory("Lifecycle",
                 ("Register App Show/Hide", DoRegisterAppLifecycle),
                 ("Set Before-Exit Listener", DoSetBeforeExit));
 
-            AddCategory("账号 / Auth",
+            AddCategory("Auth",
                 ("Login", DoLogin),
                 ("Authorize userInfo", DoAuthorize));
 
-            AddCategory("分享 / Share",
+            AddCategory("Share",
                 ("Share App Message", DoShare));
 
-            AddCategory("支付 / Payment",
+            AddCategory("Payment",
                 ("Pay (sample order)", DoPay),
                 ("Check Balance", DoCheckBalance),
                 ("Recharge", DoRecharge),
                 ("Navigate To Balance", DoNavigateToBalance));
 
-            AddCategory("任务奖励 / Mission",
+            AddCategory("Mission",
                 ("Start Entrance Mission", DoStartEntranceMission),
                 ("Get Entrance Mission Reward", DoGetEntranceMissionReward));
 
-            AddCategory("广告 / Ads",
+            AddCategory("Ads",
                 ("Rewarded Video Ad", DoRewardedAd),
                 ("Interstitial Ad", DoInterstitialAd));
 
-            AddCategory("网络 / Network",
+            AddCategory("Network",
                 ("Get Network Type", DoGetNetworkType),
                 ("On NetworkStatus Change", DoOnNetworkStatusChange),
                 ("Off NetworkStatus Change", DoOffNetworkStatusChange),
                 ("On NetworkWeak Change", DoOnNetworkWeakChange),
                 ("Off NetworkWeak Change", DoOffNetworkWeakChange));
 
-            AddCategory("设备 / Device",
+            AddCategory("Device",
                 ("Vibrate Short", DoVibrateShort),
                 ("Vibrate Long", DoVibrateLong),
                 ("Set FPS 30", () => SetFps(30)),
                 ("Set FPS 60", () => SetFps(60)));
 
-            AddCategory("键盘 / Keyboard",
+            AddCategory("Keyboard",
                 ("Show Keyboard", DoShowKeyboard),
                 ("Hide Keyboard", DoHideKeyboard));
 
-            AddCategory("桌面快捷 / Shortcut",
+            AddCategory("Shortcut",
                 ("Add Shortcut", DoAddShortcut));
 
-            AddCategory("存档 / Storage",
+            AddCategory("Storage",
                 ("PlayerPrefs ++counter", DoPlayerPrefs),
                 ("Save<DemoSaving>", DoSaveTyped),
                 ("Load<DemoSaving>", DoLoadTyped),
@@ -142,11 +142,11 @@ namespace TikTokMiniGameDemo
                 ("Clear All Savings", DoClearAllSavings),
                 ("Saving Disk Size", DoSavingDiskSize));
 
-            AddCategory("Feed 直玩",
+            AddCategory("Feed",
                 ("On Feed Status Change", DoOnFeedStatusChange),
                 ("Off Feed Status Change", DoOffFeedStatusChange));
 
-            AddCategory("上报 / Analytics",
+            AddCategory("Analytics",
                 ("Report Event", DoReportEvent),
                 ("Report Scene", DoReportScene));
         }

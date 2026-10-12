@@ -69,11 +69,11 @@ function main() {
       scaleMode: scaleMode.default,
       // 以下配置的样式，尺寸相对设计宽高
       textConfig: {
-        firstStartText: '首次加载请耐心等待',
-        downloadingText: ['正在加载资源'],
-        compilingText: '编译中',
-        initText: '初始化中',
-        completeText: '开始游戏',
+        firstStartText: 'First load may take a while, please wait',
+        downloadingText: ['Loading resources'],
+        compilingText: 'Compiling',
+        initText: 'Initializing',
+        completeText: 'Start Game',
         textDuration: 1500,
         // 文字样式
         style: {
