@@ -64,6 +64,8 @@ namespace TikTokMiniGameDemo
             // TT.TTSDKVersion theo dõi bản revision nội bộ của mã nguồn SDK (ví dụ 6.3.9),
             // trong khi các nhà phát triển (CP) thường ghi nhớ theo phiên bản package đã phát hành (ví dụ 1.1.1).
             TitleText.text = $"TikTok Mini Game SDK Demo  ·  v{PackageVersion}";
+            // Nếu đi qua scene Setup thì SDK đã được TikTokBootstrap init sẵn.
+            _sdkInited = AmobearTTMNG.TikTokBootstrap.IsReady;
             UpdateStatus();
 
             ClearLogButton.onClick.AddListener(ClearLog);
@@ -132,7 +134,11 @@ namespace TikTokMiniGameDemo
                 ("Hide Keyboard", DoHideKeyboard));
 
             AddCategory("Shortcut",
-                ("Add Shortcut", DoAddShortcut));
+                ("Can I Use Shortcut", DoCanIUseShortcut),
+                ("Add Shortcut", DoAddShortcut),
+                ("Get Shortcut Mission Reward", DoGetShortcutMissionReward),
+                ("TryClaim Shortcut Reward", DoTryClaimShortcutReward),
+                ("Reset Local Shortcut Ledger", DoResetShortcutLedger));
 
             AddCategory("Storage",
                 ("PlayerPrefs ++counter", DoPlayerPrefs),
@@ -663,7 +669,45 @@ namespace TikTokMiniGameDemo
         /// </summary>
         private void DoAddShortcut()
         {
-            TT.AddShortcut(ok => Log($"  ← AddShortcut: {ok}"));
+            TT.AddShortcut(ok => Log($"  ← AddShortcut: {ok} (chưa phát thưởng — cần mở lại từ icon)"));
+        }
+
+        /// <summary>
+        /// <c>CanIUse.AddShortcut</c> / <c>CanIUse.GetShortcutMissionReward</c> — client có hỗ trợ không.
+        /// </summary>
+        private void DoCanIUseShortcut()
+        {
+            Log($"  ← CanIUse AddShortcut={CanIUse.AddShortcut} GetShortcutMissionReward={CanIUse.GetShortcutMissionReward}");
+        }
+
+        /// <summary>
+        /// <c>TT.GetShortcutMissionReward</c> — phiên hiện tại có được mở từ icon màn hình chính không.
+        /// Gọi ngay sau AddShortcut trong cùng phiên luôn ra false; test bằng launch mode <c>scene_shortcut</c>.
+        /// </summary>
+        private void DoGetShortcutMissionReward()
+        {
+            TT.GetShortcutMissionReward(new GetShortcutMissionRewardParam
+            {
+                Success = r => Log($"  ← GetShortcutMissionReward canReceiveReward={r?.CanReceiveReward}"),
+                Fail = err => Log($"  ← GetShortcutMissionReward fail: {err?.ErrorCode} {err?.ErrMsg}"),
+                Complete = () => Log("  ← GetShortcutMissionReward complete"),
+            });
+        }
+
+        /// <summary>
+        /// <see cref="AmobearTTMNG.TikTokShortcut.TryClaim"/> — kiểm tra điều kiện + sổ cục bộ, phát thưởng một lần/ngày.
+        /// </summary>
+        private void DoTryClaimShortcutReward()
+        {
+            AmobearTTMNG.TikTokShortcut.TryClaim(
+                grant: () => Log("  ← Shortcut reward GRANTED (game cộng thưởng ở đây)"),
+                onDone: granted => Log($"  ← TryClaim granted={granted} claimedThisPeriod={AmobearTTMNG.TikTokShortcut.HasClaimedThisPeriod}"));
+        }
+
+        private void DoResetShortcutLedger()
+        {
+            AmobearTTMNG.TikTokShortcut.ResetLocalLedger();
+            Log("  ← Local shortcut ledger reset (trạng thái phía nền tảng không reset được)");
         }
 
         #endregion
