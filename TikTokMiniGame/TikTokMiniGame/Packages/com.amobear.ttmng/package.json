@@ -1,0 +1,18 @@
+{
+  "name": "com.amobear.ttmng",
+  "version": "1.0.0",
+  "displayName": "Amobear TikTok Mini Game",
+  "description": "Shared modules and editor tools for shipping Unity games as TikTok Mini Games: SDK bootstrap, storage, ads, desktop shortcut / sidebar revisit, share, safe area, network, vibrate, optional HS SDK bridge (login / IAP / cloud save), plus Setup, Validate and Build tools.\n\nRequires the TikTok Unity SDK com.tiktok.minigame 1.1.5-Release imported into Assets/Plugins. HS SDK is optional.",
+  "unity": "2022.3",
+  "dependencies": {
+    "com.unity.ugui": "1.0.0"
+  },
+  "author": {
+    "name": "Amobear"
+  },
+  "keywords": [
+    "tiktok",
+    "minigame",
+    "webgl"
+  ]
+}

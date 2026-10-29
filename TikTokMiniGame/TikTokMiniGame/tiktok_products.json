@@ -1,0 +1,30 @@
+{
+  "products": [
+    {
+      "id": "1",
+      "product_key": "coin_pack_small",
+      "name": "COIN PACK (1,000)",
+      "description": "GET 1,000 COINS INSTANTLY.",
+      "beans_cost": 99,
+      "price_label": "99",
+      "tag_label": "",
+      "icon": "icon_coin_pack1",
+      "rewards": [
+        { "type": "coin", "amount": 1000 }
+      ]
+    },
+    {
+      "id": "2",
+      "product_key": "no_ads_pack",
+      "name": "REMOVE ADS",
+      "description": "NO MORE INTERSTITIAL ADS.",
+      "beans_cost": 299,
+      "price_label": "299",
+      "tag_label": "BEST",
+      "icon": "icon_no_ads",
+      "rewards": [
+        { "type": "no_ads", "amount": 1 }
+      ]
+    }
+  ]
+}

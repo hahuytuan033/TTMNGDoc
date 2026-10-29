@@ -1,0 +1,19 @@
+{
+    "name": "AmobearTTMNG.HS",
+    "rootNamespace": "AmobearTTMNG",
+    "references": [
+        "AmobearTTMNG.Runtime",
+        "TTWebGL"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "AMOBEAR_TTMNG_HS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

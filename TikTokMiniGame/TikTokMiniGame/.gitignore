@@ -34,3 +34,6 @@ sysinfo.txt
 *.unitypackage
 *.app
 crashlytics-build.properties
+
+# TikTok mini game build output
+/tt-minigame/

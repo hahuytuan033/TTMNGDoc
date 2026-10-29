@@ -1,5 +1,13 @@
 {
   "dependencies": {
+    "com.amobear.ttmng": {
+      "version": "file:com.amobear.ttmng",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.ugui": "1.0.0"
+      }
+    },
     "com.coplaydev.coplay": {
       "version": "https://github.com/CoplayDev/coplay-unity-plugin.git",
       "depth": 0,
