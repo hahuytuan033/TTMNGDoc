@@ -74,6 +74,13 @@ namespace AmobearTTMNG.Installer
 				EditorApplication.Exit(1);
 				return;
 			}
+			// Batch mode thường import đồng bộ (sự kiện completed đã bắn xong) — có TTSDK rồi thì thoát luôn.
+			if (ReadInstalledVersion() != null)
+			{
+				SyncDefine(true);
+				EditorApplication.Exit(0);
+				return;
+			}
 			// Đăng ký SAU Import để OnImported (bật define) chạy trước khi thoát.
 			AssetDatabase.importPackageCompleted += _ => EditorApplication.Exit(ReadInstalledVersion() != null ? 0 : 1);
 			AssetDatabase.importPackageFailed += (_, error) =>
