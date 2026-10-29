@@ -24,6 +24,7 @@ namespace AmobearTTMNG.Installer
 		private const string BundledFile = "TTSDK~/com.tiktok.minigame@" + SdkVersion + ".unitypackage";
 		private const string LogPrefix = "[TikTokInstaller]";
 		private const string AskedKey = "AmobearTTMNG.Installer.Asked";
+		private const string ExitAfterImportKey = "AmobearTTMNG.Installer.ExitAfterImport";
 
 		private static bool importing;
 
@@ -35,6 +36,21 @@ namespace AmobearTTMNG.Installer
 
 		static TikTokSdkInstaller()
 		{
+			// InstallFromCommandLine: import đồng bộ trong batch mode reload domain giữa chừng nên phần sau ImportPackage
+			// không chạy tiếp — domain mới kết thúc thay.
+			if (SessionState.GetBool(ExitAfterImportKey, false) && ReadInstalledVersion() != null)
+			{
+				SessionState.EraseBool(ExitAfterImportKey);
+				// Không thoát ngay trong lúc domain đang nạp.
+				EditorApplication.delayCall += () =>
+				{
+					SyncDefine(true);
+					AssetDatabase.SaveAssets();
+					EditorApplication.Exit(0);
+				};
+				return;
+			}
+
 			// Chờ Editor ổn định (AssetDatabase sẵn sàng) rồi mới kiểm.
 			EditorApplication.delayCall += () => Check(interactive: !Application.isBatchMode);
 		}
@@ -66,18 +82,22 @@ namespace AmobearTTMNG.Installer
 			if (ReadInstalledVersion() != null)
 			{
 				SyncDefine(true);
+				AssetDatabase.SaveAssets();
 				EditorApplication.Exit(0);
 				return;
 			}
+			SessionState.SetBool(ExitAfterImportKey, true);
 			if (!Import(interactive: false))
 			{
 				EditorApplication.Exit(1);
 				return;
 			}
-			// Batch mode thường import đồng bộ (sự kiện completed đã bắn xong) — có TTSDK rồi thì thoát luôn.
+			// Import xong mà không reload domain (hiếm) — vẫn tới được đây.
 			if (ReadInstalledVersion() != null)
 			{
+				SessionState.EraseBool(ExitAfterImportKey);
 				SyncDefine(true);
+				AssetDatabase.SaveAssets();
 				EditorApplication.Exit(0);
 				return;
 			}
