@@ -40,10 +40,11 @@ namespace AmobearTTMNG.Installer
 			// không chạy tiếp — domain mới kết thúc thay.
 			if (SessionState.GetBool(ExitAfterImportKey, false) && ReadInstalledVersion() != null)
 			{
-				SessionState.EraseBool(ExitAfterImportKey);
-				// Không thoát ngay trong lúc domain đang nạp.
+				// Không thoát ngay trong lúc domain đang nạp. Import + bật define gây nhiều lần reload liên tiếp, mỗi lần
+				// xoá delayCall cũ — nên chỉ xoá cờ khi thật sự thoát; reload nào cũng xếp lại lần thoát này.
 				EditorApplication.delayCall += () =>
 				{
+					SessionState.EraseBool(ExitAfterImportKey);
 					SyncDefine(true);
 					AssetDatabase.SaveAssets();
 					EditorApplication.Exit(0);
