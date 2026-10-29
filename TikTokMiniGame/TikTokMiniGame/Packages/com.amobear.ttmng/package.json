@@ -1,12 +1,20 @@
 {
   "name": "com.amobear.ttmng",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "displayName": "Amobear TikTok Mini Game",
-  "description": "Shared modules and editor tools for shipping Unity games as TikTok Mini Games: SDK bootstrap, storage, ads, desktop shortcut / sidebar revisit, share, safe area, network, vibrate (ads-only monetization), plus Setup, Validate and Build tools.\n\nRequires the TikTok Unity SDK com.tiktok.minigame 1.1.5-Release imported into Assets/Plugins.",
+  "description": "Shared modules and editor tools for shipping Unity games as TikTok Mini Games: SDK bootstrap, storage, ads, desktop shortcut / sidebar revisit, share, safe area, network, vibrate (ads-only monetization), plus Setup, Validate and Build tools.\n\nBundles the TikTok Unity SDK com.tiktok.minigame 1.1.5-Release (TTSDK~/) and offers to import it into Assets/Plugins when missing.",
   "unity": "2022.3",
   "dependencies": {
-    "com.unity.ugui": "1.0.0"
+    "com.unity.ugui": "1.0.0",
+    "com.unity.textmeshpro": "3.0.6"
   },
+  "samples": [
+    {
+      "displayName": "Demo",
+      "description": "Setup scene (TikTokBootstrap), Shortcut / Sidebar Revisit / Share popups and an API test menu. Menu AmobearTTMNG/Demo/Add Demo Scenes to Build after import.",
+      "path": "Samples~/Demo"
+    }
+  ],
   "author": {
     "name": "Amobear"
   },

@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using TTSDK.Tool;
 using UnityEditor;
 using UnityEngine;
@@ -11,8 +10,8 @@ namespace AmobearTTMNG.EditorTools
 	/// <summary>Đường dẫn và phép kiểm tra dùng chung cho Setup / Validate / Build.</summary>
 	internal static class TikTokEditorPaths
 	{
-		/// <summary>Bản TTSDK mà package này đã chạy thật trên TikTok (pocket-2). Đổi bản = test lại toàn bộ module.</summary>
-		public const string ExpectedSdkVersion = "1.1.5-Release";
+		/// <summary>Bản TTSDK mà package này đã chạy thật trên TikTok (pocket-2) và đóng kèm trong TTSDK~/. Đổi bản = test lại toàn bộ module.</summary>
+		public const string ExpectedSdkVersion = Installer.TikTokSdkInstaller.SdkVersion;
 
 		/// <summary>Mọi thứ riêng của game mà package tạo ra nằm ở đây (không nằm trong package).</summary>
 		public const string ConfigFolder = "Assets/TikTokConfig";
@@ -32,13 +31,7 @@ namespace AmobearTTMNG.EditorTools
 		public static string RootProjectConfigJson => Path.Combine(ProjectRoot, "project.config.json");
 
 		/// <summary>"version" trong package.json của TTSDK; null nếu chưa import.</summary>
-		public static string ReadSdkVersion()
-		{
-			if (!File.Exists(SdkPackageJson))
-				return null;
-			Match match = Regex.Match(File.ReadAllText(SdkPackageJson), "\"version\"\\s*:\\s*\"([^\"]+)\"");
-			return match.Success ? match.Groups[1].Value : null;
-		}
+		public static string ReadSdkVersion() => Installer.TikTokSdkInstaller.ReadInstalledVersion();
 
 		/// <summary>Scene đầu tiên được bật trong Build Settings (scene chạy InitSDK); null nếu không có.</summary>
 		public static string FirstBuildScene() => EditorBuildSettings.scenes.FirstOrDefault(s => s.enabled)?.path;

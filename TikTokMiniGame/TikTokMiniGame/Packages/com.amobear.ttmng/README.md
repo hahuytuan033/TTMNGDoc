@@ -14,15 +14,28 @@ Mọi code nằm trong `namespace AmobearTTMNG` (ads: `AmobearTTMNG.Ads`, công 
 
 ## 1. Đưa vào game mới
 
-**Yêu cầu:** Unity 2022.3 (đã kiểm chứng 2022.3.62f2; Unity 6 chưa phải baseline của TikTok).
+**Yêu cầu:** Unity 2022.3 (đã kiểm chứng 2022.3.62f2; Unity 6 chưa phải baseline của TikTok), repo game dùng git.
 
-1. **Import TTSDK TRƯỚC** — `com.tiktok.minigame@1.1.5-Release.unitypackage` (bản lưu trong repo TTMNGDoc ở
-   `Package/`). Package này tham chiếu assembly `TTWebGL` của TTSDK nên thiếu TTSDK là không biên dịch được, kể cả
-   menu Setup.
-2. Thêm vào `Packages/manifest.json`:
-   ```json
-   "com.amobear.ttmng": "https://svn.as.local/tuanvhh/ttmngdoc.git?path=/TikTokMiniGame/TikTokMiniGame/Packages/com.amobear.ttmng#ttmng-v1.0.0"
+1. **Thêm template vào game** (một lần cho mỗi game) — chạy từ một bản clone TTMNGDoc bất kỳ:
+   ```powershell
+   # Windows
+   powershell -ExecutionPolicy Bypass -File <TTMNGDoc>\tools\add-ttmng.ps1 -GameProject D:\Games\MyGame
    ```
+   ```bash
+   # macOS
+   <TTMNGDoc>/tools/add-ttmng.sh ~/Games/MyGame
+   ```
+   Script thêm submodule nông (`--depth 1`) `TTMNG/` ở gốc repo game, checkout tag `ttmng-v*` mới nhất, rồi ghi vào
+   `Packages/manifest.json`:
+   `"com.amobear.ttmng": "file:../TTMNG/TikTokMiniGame/TikTokMiniGame/Packages/com.amobear.ttmng"`.
+   Tham số `-Ref` / đối số thứ 2 để chọn tag hoặc `master`. Xong thì commit `.gitmodules`, `TTMNG`, `manifest.json`.
+2. **Mở Unity → chọn Import** khi được hỏi TikTok SDK. TTSDK 1.1.5-Release đi kèm package (`TTSDK~/`), được import
+   vào `Assets/Plugins/com.tiktok.minigame`. Bỏ qua thì dùng menu **`AmobearTTMNG/Install TikTok SDK`** sau.
+   - Các assembly `AmobearTTMNG.*` chỉ biên dịch khi có define `AMOBEAR_TTMNG_TTSDK`. Bộ cài (assembly riêng, không
+     phụ thuộc TTSDK) tự thêm define này cho WebGL / Standalone / Android / iOS khi thấy TTSDK, gỡ khi không thấy.
+   - **Chưa cài xong TTSDK thì đừng viết code gọi `AmobearTTMNG`** trong Assembly-CSharp: lỗi biên dịch ở đó chặn
+     Editor reload nên bộ cài không chạy được. Lỡ gặp thì tạm comment code đó, hoặc tự thêm define trong
+     Player Settings → Scripting Define Symbols.
 3. Menu **`AmobearTTMNG/Setup Project`** (chạy lại thoải mái):
    - chuyển sang WebGL + IL2CPP, bộ nhớ 128MB, tắt nén / data caching, bật bulk-memory;
    - `Assets/Editor/StarkBuilderSetting.asset`: output `<project>/tt-minigame`, WebGL2, bulk memory;
@@ -45,16 +58,51 @@ Mọi code nằm trong `namespace AmobearTTMNG` (ads: `AmobearTTMNG.Ads`, công 
 
 | Thuộc package (cập nhật bằng cách đổi tag) | Thuộc từng game (nằm trong Assets / scene của game) |
 |---|---|
-| `Runtime/` (assembly `AmobearTTMNG.Runtime`) | `Assets/Plugins/com.tiktok.minigame` (TTSDK) |
-| `Editor/` (menu `AmobearTTMNG/...`) | `Assets/Editor/StarkBuilderSetting.asset` (App ID, output — TTSDK chỉ đọc đúng đường dẫn này) |
+| `Runtime/` (assembly `AmobearTTMNG.Runtime`) | `Assets/Plugins/com.tiktok.minigame` (TTSDK, import từ `TTSDK~/`) |
+| `Editor/` (menu `AmobearTTMNG/...`), `Editor/Installer/` | `Assets/Editor/StarkBuilderSetting.asset` (App ID, output — TTSDK chỉ đọc đúng đường dẫn này) |
+| `TTSDK~/`, `Samples~/Demo` | Define `AMOBEAR_TTMNG_TTSDK` (ProjectSettings) |
 | | `Assets/TikTokConfig/Resources/TikTokAdsConfig.asset` (Placement ID) |
 | | Scene 0 có `TikTokBootstrap` |
 | | Phần thưởng: handler `OnRewardClaimed`, `ClaimPeriod`, `ServerClaim` |
 
 ### 1.2. Nâng / cố định phiên bản
 
-Đổi tag cuối URL trong `manifest.json` (`#ttmng-v1.0.0` → tag mới) rồi đọc `CHANGELOG.md`. Package chỉ chạy với
-TTSDK **1.1.5-Release**; Setup / Validate báo lỗi nếu khác. Đổi bản TTSDK = test lại toàn bộ module trên máy thật.
+Mỗi game ghim template theo commit của submodule `TTMNG`. Nâng lên tag mới (đọc `CHANGELOG.md` trước):
+```bash
+git -C TTMNG fetch --depth 1 origin tag ttmng-v1.2.0
+git -C TTMNG checkout ttmng-v1.2.0
+git add TTMNG && git commit -m "Update TTMNG template to 1.2.0"
+```
+Người khác clone game: `git clone --recurse-submodules <game-url>` (hoặc `git submodule update --init` sau khi clone).
+
+Package chỉ chạy với TTSDK **1.1.5-Release**; Setup / Validate báo lỗi nếu khác. Đổi bản TTSDK = test lại toàn bộ
+module trên máy thật.
+
+### 1.3. Sửa template ngay trong game
+
+Package `file:` sửa trực tiếp được trong Unity. Submodule mặc định ở detached HEAD, nên chuyển nhánh trước khi sửa:
+```bash
+git -C TTMNG checkout master && git -C TTMNG pull
+# sửa trong Unity → commit + push trong TTMNG, rồi commit con trỏ TTMNG ở repo game
+```
+Submodule clone nông: push được bình thường; cần lịch sử thì `git -C TTMNG fetch --unshallow`.
+
+### 1.4. Cách khác: UPM git URL (chỉ đọc)
+
+Không cần submodule, không sửa được từ game:
+```json
+"com.amobear.ttmng": "https://svn.as.local/tuanvhh/ttmngdoc.git?path=/TikTokMiniGame/TikTokMiniGame/Packages/com.amobear.ttmng#ttmng-v1.1.0"
+```
+
+### 1.5. Sample Demo
+
+Package Manager → **Amobear TikTok Mini Game** → **Samples** → **Demo** → Import (vào `Assets/Samples/…/Demo`).
+Menu **`AmobearTTMNG/Demo/Add Demo Scenes to Build`** thêm Setup / Demo / MainMenu vào cuối Build Settings; kéo
+Setup của demo lên index 0 để chạy thử Shortcut / Sidebar / Share / Ads và menu API trên máy thật. Xoá thư mục
+Sample + gỡ scene khỏi Build Settings trước khi build bản thật.
+
+Project dev TTMNGDoc giữ bản gốc ở `Assets/Demo`; sửa xong chạy **`AmobearTTMNG/Dev/Sync Demo → Samples~`** trước khi
+gắn tag.
 
 ---
 

@@ -37,3 +37,6 @@ crashlytics-build.properties
 
 # TikTok mini game build output
 /tt-minigame/
+
+# TTSDK đi kèm package (bộ cài tự import)
+!/Packages/com.amobear.ttmng/TTSDK~/*.unitypackage

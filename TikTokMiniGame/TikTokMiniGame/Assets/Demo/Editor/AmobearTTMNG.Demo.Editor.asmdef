@@ -1,0 +1,22 @@
+{
+    "name": "AmobearTTMNG.Demo.Editor",
+    "rootNamespace": "TikTokMiniGameDemo.EditorTools",
+    "references": [
+        "AmobearTTMNG.Demo",
+        "Unity.TextMeshPro",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "AMOBEAR_TTMNG_TTSDK"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

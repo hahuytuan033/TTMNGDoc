@@ -763,7 +763,10 @@ PlayerSettings:
   webGLMemoryGeometricGrowthCap: 96
   webGLPowerPreference: 2
   scriptingDefineSymbols:
-    WebGL: TTSDK_MIX_ENGINE
+    Android: AMOBEAR_TTMNG_TTSDK
+    Standalone: AMOBEAR_TTMNG_TTSDK
+    WebGL: TTSDK_MIX_ENGINE;AMOBEAR_TTMNG_TTSDK
+    iPhone: AMOBEAR_TTMNG_TTSDK
   additionalCompilerArguments: {}
   platformArchitecture: {}
   scriptingBackend:

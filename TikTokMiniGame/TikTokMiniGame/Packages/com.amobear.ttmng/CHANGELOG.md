@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.1.0] — 2026-10-29
+
+Dùng repo TTMNGDoc làm git submodule trong game (`tools/add-ttmng.ps1` / `.sh`).
+
+### Added
+- TTSDK 1.1.5-Release đi kèm package (`TTSDK~/`). Assembly `AmobearTTMNG.Installer` (không phụ thuộc TTSDK) hỏi import
+  khi project chưa có SDK, menu `AmobearTTMNG/Install TikTok SDK`, `InstallFromCommandLine` cho batch mode.
+- Sample **Demo** (`Samples~/Demo`): scene Setup / Demo / MainMenu, menu `AmobearTTMNG/Demo/Add Demo Scenes to Build`.
+- Dependency `com.unity.textmeshpro` (Sample dùng TMP).
+
+### Changed
+- `AmobearTTMNG.Runtime` / `AmobearTTMNG.Editor` chỉ biên dịch khi có define `AMOBEAR_TTMNG_TTSDK` (bộ cài tự bật / gỡ)
+  — game chưa có TTSDK không còn lỗi đỏ.
+- Bỏ `DemoSetup` (ghi đè companyName / productName / bundle id của game); WebGL / IL2CPP do `Setup Project` lo.
+
 ## [1.0.0] — 2026-10-29
 
 Bản đầu dưới dạng UPM package (trước đây copy thư mục `Assets/AmobearTTMNG`). Kiểm chứng với TTSDK 1.1.5-Release,

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using TikTokMiniGameDemo;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -12,15 +13,31 @@ namespace TikTokMiniGameDemo.EditorTools
 {
     /// <summary>
     /// Rebuilds the <c>MainMenu.unity</c> scene entirely from code so the layout never
-    /// drifts. Triggered manually via the <c>AmobearTTMNG → Demo → Rebuild MainMenu Scene</c>
-    /// menu item, or as part of <see cref="DemoSetup.RunAll"/>.
+    /// drifts. Triggered manually via the <c>AmobearTTMNG → Demo → Rebuild MainMenu Scene</c> menu item.
     /// 通过纯代码重建 <c>MainMenu.unity</c> 场景，避免布局飘移。
-    /// 可通过菜单 <c>AmobearTTMNG → Demo → Rebuild MainMenu Scene</c> 手动触发，
-    /// 也会被 <see cref="DemoSetup.RunAll"/> 调用。
+    /// 可通过菜单 <c>AmobearTTMNG → Demo → Rebuild MainMenu Scene</c> 手动触发。
+    ///
+    /// Demo cũng là Sample của package: import vào game thì nằm ở Assets/Samples/…/Demo, nên mọi đường dẫn
+    /// tính từ thư mục chứa chính script này, không hardcode Assets/Demo.
     /// </summary>
     public static class DemoSceneBuilder
     {
-        private const string ScenePath = "Assets/Demo/Scenes/MainMenu.unity";
+        /// <summary>Thứ tự build của demo: Setup (TikTokBootstrap, InitSDK) → Demo → MainMenu.</summary>
+        private static readonly string[] DemoScenes = { "Setup", "Demo", "MainMenu" };
+
+        /// <summary>Thư mục Demo (cha của thư mục Editor chứa script này).</summary>
+        private static string DemoFolder
+        {
+            get
+            {
+                string script = AssetDatabase.FindAssets($"{nameof(DemoSceneBuilder)} t:MonoScript")
+                    .Select(AssetDatabase.GUIDToAssetPath)
+                    .First(p => Path.GetFileNameWithoutExtension(p) == nameof(DemoSceneBuilder));
+                return Path.GetDirectoryName(Path.GetDirectoryName(script))!.Replace('\\', '/');
+            }
+        }
+
+        private static string ScenePathOf(string name) => $"{DemoFolder}/Scenes/{name}.unity";
 
         /// <summary>
         /// Build the demo scene in memory, save it to disk and add it to Build Settings if missing.
@@ -29,26 +46,43 @@ namespace TikTokMiniGameDemo.EditorTools
         [MenuItem("AmobearTTMNG/Demo/Rebuild MainMenu Scene", false, 200)]
         public static void BuildAndSave()
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(ScenePath)!);
+            string scenePath = ScenePathOf("MainMenu");
+            Directory.CreateDirectory(Path.GetDirectoryName(scenePath)!);
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects, NewSceneMode.Single);
             BuildHierarchy();
 
-            bool saved = EditorSceneManager.SaveScene(scene, ScenePath);
-            Debug.Log($"[DemoSceneBuilder] Saved scene → {ScenePath} (ok={saved})");
-
-            // EN: Append only. Scene #0 must stay the Setup scene with TikTokBootstrap (InitSDK runs there).
-            // ZH: 只追加。0 号场景必须保持为带 TikTokBootstrap 的 Setup 场景（InitSDK 在那里执行）。
-            var buildScenes = EditorBuildSettings.scenes;
-            if (Array.FindIndex(buildScenes, s => s.path == ScenePath) < 0)
-            {
-                Array.Resize(ref buildScenes, buildScenes.Length + 1);
-                buildScenes[buildScenes.Length - 1] = new EditorBuildSettingsScene(ScenePath, true);
-                EditorBuildSettings.scenes = buildScenes;
-            }
+            bool saved = EditorSceneManager.SaveScene(scene, scenePath);
+            Debug.Log($"[DemoSceneBuilder] Saved scene → {scenePath} (ok={saved})");
+            AppendToBuild(scenePath);
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
+        }
+
+        /// <summary>
+        /// Thêm Setup, Demo, MainMenu của demo vào CUỐI Build Settings (không đụng scene của game). Muốn chạy demo trên
+        /// máy thật thì kéo Setup của demo lên index 0 — InitSDK chạy ở scene đầu.
+        /// </summary>
+        [MenuItem("AmobearTTMNG/Demo/Add Demo Scenes to Build", false, 201)]
+        public static void AddDemoScenesToBuild()
+        {
+            foreach (string name in DemoScenes)
+                AppendToBuild(ScenePathOf(name));
+            Debug.Log($"[DemoSceneBuilder] Demo scenes in build: {string.Join(", ", DemoScenes.Select(ScenePathOf))}. " +
+                "Kéo Setup của demo lên index 0 để chạy demo.");
+        }
+
+        // EN: Append only. Scene #0 must stay the Setup scene with TikTokBootstrap (InitSDK runs there).
+        // ZH: 只追加。0 号场景必须保持为带 TikTokBootstrap 的 Setup 场景（InitSDK 在那里执行）。
+        private static void AppendToBuild(string scenePath)
+        {
+            var buildScenes = EditorBuildSettings.scenes;
+            if (Array.FindIndex(buildScenes, s => s.path == scenePath) >= 0)
+                return;
+            Array.Resize(ref buildScenes, buildScenes.Length + 1);
+            buildScenes[buildScenes.Length - 1] = new EditorBuildSettingsScene(scenePath, true);
+            EditorBuildSettings.scenes = buildScenes;
         }
 
         /// <summary>
