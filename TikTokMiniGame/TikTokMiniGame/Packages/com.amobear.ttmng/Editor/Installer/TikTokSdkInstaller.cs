@@ -25,6 +25,8 @@ namespace AmobearTTMNG.Installer
 		private const string LogPrefix = "[TikTokInstaller]";
 		private const string AskedKey = "AmobearTTMNG.Installer.Asked";
 
+		private static bool importing;
+
 		// Đặt define trên các target hay dùng để đổi platform trong Editor không làm mất module.
 		private static readonly NamedBuildTarget[] Targets =
 		{
@@ -55,19 +57,38 @@ namespace AmobearTTMNG.Installer
 			Import(interactive: true);
 		}
 
-		/// <summary>Batch mode: Unity.exe -batchmode -projectPath … -executeMethod AmobearTTMNG.Installer.TikTokSdkInstaller.InstallFromCommandLine</summary>
+		/// <summary>
+		/// Batch mode (KHÔNG kèm -quit — import chạy bất đồng bộ, hàm tự thoát khi xong, exit code 0 / 1):
+		/// Unity.exe -batchmode -projectPath … -executeMethod AmobearTTMNG.Installer.TikTokSdkInstaller.InstallFromCommandLine
+		/// </summary>
 		public static void InstallFromCommandLine()
 		{
-			if (ReadInstalledVersion() == null)
-				Import(interactive: false);
-			SyncDefine(true);
+			if (ReadInstalledVersion() != null)
+			{
+				SyncDefine(true);
+				EditorApplication.Exit(0);
+				return;
+			}
+			if (!Import(interactive: false))
+			{
+				EditorApplication.Exit(1);
+				return;
+			}
+			// Đăng ký SAU Import để OnImported (bật define) chạy trước khi thoát.
+			AssetDatabase.importPackageCompleted += _ => EditorApplication.Exit(ReadInstalledVersion() != null ? 0 : 1);
+			AssetDatabase.importPackageFailed += (_, error) =>
+			{
+				Debug.LogError($"{LogPrefix} Import failed: {error}");
+				EditorApplication.Exit(1);
+			};
 		}
 
 		private static void Check(bool interactive)
 		{
 			bool installed = ReadInstalledVersion() != null;
 			SyncDefine(installed);
-			if (installed)
+			// Đang import (vd. InstallFromCommandLine) thì không hỏi / import lần nữa.
+			if (installed || importing)
 				return;
 
 			// Mỗi phiên Editor chỉ hỏi một lần; từ chối thì vẫn còn menu AmobearTTMNG/Install TikTok SDK.
@@ -82,17 +103,43 @@ namespace AmobearTTMNG.Installer
 				Debug.LogWarning($"{LogPrefix} Chưa có TTSDK — module AmobearTTMNG tạm tắt. Menu AmobearTTMNG/Install TikTok SDK để cài.");
 		}
 
-		private static void Import(bool interactive)
+		private static bool Import(bool interactive)
 		{
 			string path = BundledPath();
 			if (path == null || !File.Exists(path))
 			{
 				Debug.LogError($"{LogPrefix} Không tìm thấy {BundledFile} trong package com.amobear.ttmng.");
-				return;
+				return false;
 			}
+			// Chỉ bật define khi TTSDK đã thật sự nằm trong Assets: bật sớm thì Runtime / Editor biên dịch thiếu TTWebGL.
+			AssetDatabase.importPackageCompleted -= OnImported;
+			AssetDatabase.importPackageCompleted += OnImported;
+			importing = true;
 			Debug.Log($"{LogPrefix} Importing {path}");
-			// Define bật sau khi import xong (lần Check kế tiếp sau domain reload).
 			AssetDatabase.ImportPackage(path, interactive);
+			return true;
+		}
+
+		private static void OnImported(string packageName)
+		{
+			AssetDatabase.importPackageCompleted -= OnImported;
+			importing = false;
+			SyncDefine(ReadInstalledVersion() != null);
+		}
+
+		/// <summary>
+		/// TTSDK được thêm / xoá trong Assets → bật / gỡ define ngay sau khi import, trước khi Unity biên dịch lại: xoá
+		/// TTSDK mà define còn thì Runtime / Editor lỗi thiếu TTWebGL và domain không reload để Check() kịp chạy.
+		/// </summary>
+		private sealed class SdkWatcher : AssetPostprocessor
+		{
+			private const string SdkFolder = "Assets/Plugins/com.tiktok.minigame";
+
+			private static void OnPostprocessAllAssets(string[] imported, string[] deleted, string[] moved, string[] movedFrom)
+			{
+				if (imported.Concat(deleted).Concat(moved).Concat(movedFrom).Any(p => p.StartsWith(SdkFolder)))
+					SyncDefine(ReadInstalledVersion() != null);
+			}
 		}
 
 		private static string BundledPath()
