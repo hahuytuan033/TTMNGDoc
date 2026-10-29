@@ -74,6 +74,75 @@ namespace TikTokMiniGameDemo
         private bool _sidebarClaimMode;
         private bool _shareClaimMode;
 
+        // Nội dung soạn trong Demo.unity (tiêu đề, mô tả, các bước hướng dẫn) — hiện nguyên khi bắt đầu luồng.
+        private PopupContent _shortcutContent;
+        private PopupContent _revisitContent;
+        private PopupContent _shareContent;
+
+        /// <summary>
+        /// Giữ nội dung popup soạn trong scene. <see cref="ShowAuthored"/> trả lại đúng nội dung đó; <see cref="ShowMessage"/>
+        /// thay bằng thông báo (có quà / đã nhận) và ẩn các bước hướng dẫn nằm cạnh mô tả (vd. ảnh trong Content).
+        /// </summary>
+        private sealed class PopupContent
+        {
+            private readonly TMP_Text _title;
+            private readonly TMP_Text _description;
+            private readonly TMP_Text _buttonLabel;
+            private readonly string _authoredTitle;
+            private readonly string _authoredDescription;
+            private readonly string _authoredButton;
+            private readonly Vector2 _authoredDescriptionSize;
+            private readonly List<GameObject> _guide = new List<GameObject>();
+
+            public PopupContent(TMP_Text title, TMP_Text description, Button button, string fallbackDescription)
+            {
+                _title = title;
+                _description = description;
+                _buttonLabel = button.GetComponentInChildren<TMP_Text>(true);
+                _authoredTitle = title.text;
+                // Scene để trống mô tả thì dùng câu mặc định của demo.
+                _authoredDescription = string.IsNullOrWhiteSpace(description.text) ? fallbackDescription : description.text;
+                _authoredButton = _buttonLabel != null ? _buttonLabel.text : null;
+                _authoredDescriptionSize = description.rectTransform.sizeDelta;
+
+                // Mô tả nằm trong nhóm riêng (không cùng cấp tiêu đề) → các anh em đang bật là phần hướng dẫn.
+                Transform group = description.transform.parent;
+                if (group != title.transform.parent)
+                    foreach (Transform child in group)
+                        if (child != description.transform && child.gameObject.activeSelf)
+                            _guide.Add(child.gameObject);
+            }
+
+            public void ShowAuthored()
+            {
+                Apply(_authoredTitle, _authoredDescription, _authoredButton, guideVisible: true);
+            }
+
+            public void ShowMessage(string title, string description, string button)
+            {
+                Apply(title, description, button, guideVisible: false);
+            }
+
+            private void Apply(string title, string description, string button, bool guideVisible)
+            {
+                _title.text = title;
+                _description.text = description;
+                if (_buttonLabel != null && button != null)
+                    _buttonLabel.text = button;
+                foreach (GameObject step in _guide)
+                    step.SetActive(guideVisible);
+
+                // Ô mô tả trong scene có thể chỉ cao vừa một dòng hướng dẫn: thông báo dài hơn thì nới chiều cao (layout
+                // xếp từ trên xuống nên chữ không tràn lên tiêu đề); quay về hướng dẫn thì trả kích thước gốc.
+                RectTransform rect = _description.rectTransform;
+                float needed = _description.GetPreferredValues(description, rect.rect.width, 0f).y;
+                rect.sizeDelta = guideVisible
+                    ? _authoredDescriptionSize
+                    : new Vector2(_authoredDescriptionSize.x, Mathf.Max(_authoredDescriptionSize.y, needed));
+                LayoutRebuilder.MarkLayoutForRebuild(rect);
+            }
+        }
+
         private void Awake()
         {
 #if UNITY_EDITOR
@@ -125,6 +194,13 @@ namespace TikTokMiniGameDemo
             SharePopup.SetActive(false);
             ShareButton.gameObject.SetActive(false);
             StatusText.text = $"Coins: {Coins}";
+
+            _shortcutContent = new PopupContent(PopupText, PopupDescription, StartButton,
+                $"Add the game to your home screen.\nOpen it from the icon next time to get {RewardCoins} coins!");
+            _revisitContent = new PopupContent(RevisitPopupText, RevisitPopupDescription, RevisitStartButton,
+                $"Go to your TikTok Profile sidebar,\nthen open the game from there to get {RewardCoins} coins!");
+            _shareContent = new PopupContent(SharePopupText, SharePopupDescription, ShareStartButton,
+                "Send the game to your TikTok friends\nand invite them to play!");
 
             AddShortcutButton.onClick.AddListener(OpenPopup);
             StartButton.onClick.AddListener(OnStartClicked);
@@ -216,33 +292,19 @@ namespace TikTokMiniGameDemo
                 OpenSharePopup();
         }
 
-        private static void SetButtonLabel(Button button, string label)
-        {
-            var text = button.GetComponentInChildren<TMP_Text>(true);
-            if (text != null)
-                text.text = label;
-        }
-
         // ------------------------------------------------------------ Shortcut
 
         private void OpenPopup()
         {
             _shortcutClaimMode = TikTokShortcut.HasPendingReward;
             if (_shortcutClaimMode)
-            {
-                PopupText.text = "Reward";
-                PopupDescription.text = $"Thanks for opening the game from your home screen!\nClaim {RewardCoins} coins.";
-                SetButtonLabel(StartButton, "Claim");
-            }
+                _shortcutContent.ShowMessage("Reward",
+                    $"Thanks for opening the game from your home screen!\nClaim {RewardCoins} coins.", "Claim");
+            else if (TikTokShortcut.HasClaimedThisPeriod)
+                _shortcutContent.ShowMessage("Add Shortcut", "You already got the shortcut reward.", "Start");
             else
-            {
-                // Bước 3 doc: lời dẫn phải nói rõ hành động và điều kiện nhận thưởng.
-                PopupText.text = "Add Shortcut";
-                PopupDescription.text = TikTokShortcut.HasClaimedThisPeriod
-                    ? "You already got the shortcut reward."
-                    : $"Add the game to your home screen.\nOpen it from the icon next time to get {RewardCoins} coins!";
-                SetButtonLabel(StartButton, "Start");
-            }
+                // Bước 3 doc: lời dẫn phải nói rõ hành động và điều kiện nhận thưởng — soạn trong scene.
+                _shortcutContent.ShowAuthored();
             StartButton.interactable = true;
             Popup.SetActive(true);
         }
@@ -286,23 +348,14 @@ namespace TikTokMiniGameDemo
         {
             _sidebarClaimMode = TikTokSidebar.HasPendingReward;
             if (_sidebarClaimMode)
-            {
-                RevisitPopupText.text = "Reward";
-                RevisitPopupDescription.text = $"Welcome back from the TikTok sidebar!\nClaim {RewardCoins} coins.";
-                SetButtonLabel(RevisitStartButton, "Claim");
-            }
+                _revisitContent.ShowMessage("Reward",
+                    $"Welcome back from the TikTok sidebar!\nClaim {RewardCoins} coins.", "Claim");
+            else if (TikTokSidebar.HasClaimedThisPeriod)
+                _revisitContent.ShowMessage("Revisit", "You already got today's sidebar reward.\nCome back tomorrow!", "Start");
             else
-            {
-                // Doc Sidebar bước 2: lời dẫn phải nói rõ phải vào lại từ sidebar trang cá nhân mới nhận được.
-                RevisitPopupText.text = "Revisit";
-                if (TikTokSidebar.HasClaimedThisPeriod)
-                    RevisitPopupDescription.text = "You already got today's sidebar reward.\nCome back tomorrow!";
-                else if (TikTokSidebar.IsWaitingForRevisit)
-                    RevisitPopupDescription.text = $"Not completed yet.\nOpen the game from your TikTok Profile sidebar to get {RewardCoins} coins.";
-                else
-                    RevisitPopupDescription.text = $"Go to your TikTok Profile sidebar,\nthen open the game from there to get {RewardCoins} coins!";
-                SetButtonLabel(RevisitStartButton, "Start");
-            }
+                // Doc Sidebar bước 2: lời dẫn phải chỉ rõ đường vào lại từ sidebar trang cá nhân — các bước soạn trong
+                // scene. Đã bấm Start nhưng chưa vào lại (IsWaitingForRevisit) vẫn hiện đúng hướng dẫn đó.
+                _revisitContent.ShowAuthored();
             RevisitStartButton.interactable = true;
             RevisitPopup.SetActive(true);
         }
@@ -345,17 +398,9 @@ namespace TikTokMiniGameDemo
         {
             _shareClaimMode = TikTokShare.HasPendingReward;
             if (_shareClaimMode)
-            {
-                SharePopupText.text = "Reward";
-                SharePopupDescription.text = $"Thanks for sharing!\nClaim {RewardCoins} coins (once a day).";
-                SetButtonLabel(ShareStartButton, "Claim");
-            }
+                _shareContent.ShowMessage("Reward", $"Thanks for sharing!\nClaim {RewardCoins} coins (once a day).", "Claim");
             else
-            {
-                SharePopupText.text = "Share";
-                SharePopupDescription.text = "Send the game to your TikTok friends\nand invite them to play!";
-                SetButtonLabel(ShareStartButton, "Share");
-            }
+                _shareContent.ShowAuthored();
             ShareStartButton.interactable = true;
             SharePopup.SetActive(true);
         }

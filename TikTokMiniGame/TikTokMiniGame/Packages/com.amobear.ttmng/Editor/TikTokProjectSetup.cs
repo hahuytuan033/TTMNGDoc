@@ -17,8 +17,7 @@ namespace AmobearTTMNG.EditorTools
 	///   2. WebGL + IL2CPP + PlayerSettings.WebGL.
 	///   3. StarkBuilderSetting: thư mục output, WebGL2, bulk memory.
 	///   4. TikTokAdsConfig trong Resources CỦA GAME.
-	///   5. Define AMOBEAR_TTMNG_HS theo HS SDK có / không.
-	///   6. Scene 0 có TikTokBootstrap (InitSDK phải chạy ở đó).
+	///   5. Scene 0 có TikTokBootstrap (InitSDK phải chạy ở đó).
 	/// App ID: menu AmobearTTMNG/Set App ID (Setup tự mở nếu còn trống).
 	/// </summary>
 	public static class TikTokProjectSetup
@@ -45,7 +44,6 @@ namespace AmobearTTMNG.EditorTools
 			ApplyPlayerSettings();
 			ApplyBuilderSetting();
 			EnsureAdsConfig();
-			SyncHsDefine();
 			EnsureBootstrapScene();
 			AssetDatabase.SaveAssets();
 
@@ -113,23 +111,6 @@ namespace AmobearTTMNG.EditorTools
 			Path.GetFileNameWithoutExtension(assetPath) == TikTokAdsConfig.ResourcePath
 			&& Path.GetFileName(Path.GetDirectoryName(assetPath)) == "Resources";
 
-		private static void SyncHsDefine()
-		{
-			bool installed = TikTokEditorPaths.IsHsSdkInstalled();
-			PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.WebGL, out string[] defines);
-			if (installed == defines.Contains(TikTokEditorPaths.HsDefine))
-			{
-				Debug.Log($"{LogPrefix} HS SDK {(installed ? "found" : "not found")}, {TikTokEditorPaths.HsDefine} {(installed ? "on" : "off")}.");
-				return;
-			}
-
-			string[] next = installed
-				? defines.Append(TikTokEditorPaths.HsDefine).ToArray()
-				: defines.Where(d => d != TikTokEditorPaths.HsDefine).ToArray();
-			PlayerSettings.SetScriptingDefineSymbols(NamedBuildTarget.WebGL, next);
-			Debug.Log($"{LogPrefix} HS SDK {(installed ? "found → added" : "not found → removed")} {TikTokEditorPaths.HsDefine} (WebGL).");
-		}
-
 		private static void EnsureBootstrapScene()
 		{
 			string scene0 = TikTokEditorPaths.FirstBuildScene();
@@ -165,8 +146,7 @@ namespace AmobearTTMNG.EditorTools
 			var scenes = EditorBuildSettings.scenes.Where(s => s.path != SetupScenePath).ToList();
 			scenes.Insert(0, new EditorBuildSettingsScene(SetupScenePath, true));
 			EditorBuildSettings.scenes = scenes.ToArray();
-			Debug.Log($"{LogPrefix} Created {SetupScenePath} as scene 0 (nextScene={so.FindProperty("nextScene").stringValue}). " +
-				"Dùng HS SDK thì thêm HS_TikTokSDK vào scene này (menu IAP TikTok Setup/Setup SDK in Scene).");
+			Debug.Log($"{LogPrefix} Created {SetupScenePath} as scene 0 (nextScene={so.FindProperty("nextScene").stringValue}).");
 		}
 
 		internal static void SetString(SerializedObject so, string name, string value)

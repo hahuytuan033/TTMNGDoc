@@ -14,9 +14,6 @@ namespace AmobearTTMNG.EditorTools
 		/// <summary>Bản TTSDK mà package này đã chạy thật trên TikTok (pocket-2). Đổi bản = test lại toàn bộ module.</summary>
 		public const string ExpectedSdkVersion = "1.1.5-Release";
 
-		/// <summary>Define bật assembly AmobearTTMNG.HS. Setup tự thêm / gỡ theo HS SDK có trong project hay không.</summary>
-		public const string HsDefine = "AMOBEAR_TTMNG_HS";
-
 		/// <summary>Mọi thứ riêng của game mà package tạo ra nằm ở đây (không nằm trong package).</summary>
 		public const string ConfigFolder = "Assets/TikTokConfig";
 
@@ -42,9 +39,6 @@ namespace AmobearTTMNG.EditorTools
 			Match match = Regex.Match(File.ReadAllText(SdkPackageJson), "\"version\"\\s*:\\s*\"([^\"]+)\"");
 			return match.Success ? match.Groups[1].Value : null;
 		}
-
-		public static bool IsHsSdkInstalled() =>
-			AppDomain.CurrentDomain.GetAssemblies().Any(a => a.GetName().Name == "HS.TikTokSDK");
 
 		/// <summary>Scene đầu tiên được bật trong Build Settings (scene chạy InitSDK); null nếu không có.</summary>
 		public static string FirstBuildScene() => EditorBuildSettings.scenes.FirstOrDefault(s => s.enabled)?.path;

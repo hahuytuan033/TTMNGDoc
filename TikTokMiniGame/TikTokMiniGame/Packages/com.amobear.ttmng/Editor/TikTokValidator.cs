@@ -7,7 +7,6 @@ using System.Text.RegularExpressions;
 using AmobearTTMNG.Ads;
 using TTSDK.Tool;
 using UnityEditor;
-using UnityEditor.Build;
 using UnityEngine;
 
 namespace AmobearTTMNG.EditorTools
@@ -98,9 +97,8 @@ namespace AmobearTTMNG.EditorTools
 				report.Warning("StarkBuilderSetting.OutputDir trống — chạy AmobearTTMNG/Setup Project.");
 
 			CheckRootProjectConfig(report, appId);
-			string scene0 = CheckBootstrapScene(report);
+			CheckBootstrapScene(report);
 			CheckAdsConfig(report);
-			CheckHs(report, scene0);
 
 			if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.WebGL)
 				report.Info("Build target chưa phải WebGL — Build sẽ tự chuyển.");
@@ -117,7 +115,7 @@ namespace AmobearTTMNG.EditorTools
 				report.Warning($"project.config.json ở thư mục gốc có appid=\"{match.Groups[1].Value}\" khác App ID — lưu lại qua AmobearTTMNG/Set App ID.");
 		}
 
-		private static string CheckBootstrapScene(TikTokValidationReport report)
+		private static void CheckBootstrapScene(TikTokValidationReport report)
 		{
 			string scene0 = TikTokEditorPaths.FirstBuildScene();
 			if (scene0 == null)
@@ -126,7 +124,6 @@ namespace AmobearTTMNG.EditorTools
 				report.Error($"Scene 0 ({scene0}) không có TikTokBootstrap — InitSDK phải chạy ở scene đầu. Chạy AmobearTTMNG/Setup Project.");
 			else
 				report.Info($"Scene 0 {scene0} có TikTokBootstrap.");
-			return scene0;
 		}
 
 		private static void CheckAdsConfig(TikTokValidationReport report)
@@ -150,31 +147,6 @@ namespace AmobearTTMNG.EditorTools
 				report.Warning($"{path}: placement chưa có Placement ID: {string.Join(", ", empty)}.");
 			else
 				report.Info($"{path}: {config.Placements.Count} placement.");
-		}
-
-		private static void CheckHs(TikTokValidationReport report, string scene0)
-		{
-			bool installed = TikTokEditorPaths.IsHsSdkInstalled();
-			PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.WebGL, out string[] defines);
-			bool enabled = defines.Contains(TikTokEditorPaths.HsDefine);
-
-			if (installed && !enabled)
-				report.Warning($"Có HS SDK nhưng chưa bật {TikTokEditorPaths.HsDefine} — TikTokHS không được build. Chạy AmobearTTMNG/Setup Project.");
-			if (!installed && enabled)
-				report.Error($"Bật {TikTokEditorPaths.HsDefine} nhưng không có HS SDK. Chạy AmobearTTMNG/Setup Project.");
-			if (!installed || !enabled || scene0 == null || !File.Exists(scene0))
-				return;
-
-			// gameId / sdkKey là field serialize trên component TikTokSDK (object HS_TikTokSDK) trong scene đầu.
-			string yaml = File.ReadAllText(scene0);
-			Match gameId = Regex.Match(yaml, @"^\s*gameId:[ \t]*(\S*)\s*$", RegexOptions.Multiline);
-			Match sdkKey = Regex.Match(yaml, @"^\s*sdkKey:[ \t]*(\S*)\s*$", RegexOptions.Multiline);
-			if (!gameId.Success)
-				report.Warning($"Scene 0 chưa có HS_TikTokSDK (menu IAP TikTok Setup/Setup SDK in Scene) — login / IAP / cloud save sẽ không chạy.");
-			else if (gameId.Groups[1].Value.Length == 0 || !sdkKey.Success || sdkKey.Groups[1].Value.Length == 0)
-				report.Warning("HS_TikTokSDK trong scene 0 chưa điền gameId / sdkKey của game trên console HS.");
-			else
-				report.Info("HS_TikTokSDK đã có gameId + sdkKey.");
 		}
 
 		[Serializable]

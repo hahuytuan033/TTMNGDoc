@@ -15,10 +15,10 @@ MonoBehaviour:
   Placements:
   - Label: rw_demo
     Type: 0
-    PlacementId: 
+    PlacementId: REWARD_ADS
   - Label: it_demo
     Type: 1
-    PlacementId: 
+    PlacementId: INTER_APP_OPEN
   InterstitialStartDelaySeconds: 15
   InterstitialIntervalSeconds: 30
   PreloadRewarded: 1

@@ -52,7 +52,7 @@ MonoBehaviour:
   NativeWhiteListRegex:
   - com.bytedance.starksdk
   - _Backup~
-  _appId: 
+  _appId: mg06e2irxwuve2wb
   version: 
   autoVersion: 0
   _webglPackagePath: C:\Developer\TTMNGDoc\TikTokMiniGame\TikTokMiniGame\tt-minigame\tt-minigame

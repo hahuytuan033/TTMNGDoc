@@ -95,18 +95,8 @@ namespace TikTokMiniGameDemo
                 ("Register App Show/Hide", DoRegisterAppLifecycle),
                 ("Set Before-Exit Listener", DoSetBeforeExit));
 
-            AddCategory("Auth",
-                ("Login", DoLogin),
-                ("Authorize userInfo", DoAuthorize));
-
             AddCategory("Share",
                 ("Share App Message", DoShare));
-
-            AddCategory("Payment",
-                ("Pay (sample order)", DoPay),
-                ("Check Balance", DoCheckBalance),
-                ("Recharge", DoRecharge),
-                ("Navigate To Balance", DoNavigateToBalance));
 
             AddCategory("Mission",
                 ("Start Entrance Mission", DoStartEntranceMission),
@@ -140,14 +130,6 @@ namespace TikTokMiniGameDemo
                 ("Refresh Shortcut Reward", DoRefreshShortcutReward),
                 ("Claim Shortcut Reward", DoClaimShortcutReward),
                 ("Reset Local Shortcut Ledger", DoResetShortcutLedger));
-
-            AddCategory("HS (Login / IAP / Cloud)",
-                ("HS Status", DoHsStatus),
-                ("HS Login", DoHsLogin),
-                ("HS Get Shop Items", DoHsShopItems),
-                ("HS Buy coin_pack_small", () => DoHsBuy("coin_pack_small")),
-                ("HS Mark Cloud Dirty", DoHsMarkDirty),
-                ("HS Sync Now", DoHsSyncNow));
 
             AddCategory("Template Modules",
                 ("Storage Probe", DoStorageProbe),
@@ -254,7 +236,7 @@ namespace TikTokMiniGameDemo
 
         /// <summary>
         /// Gọi <c>TT.InitSDK</c>. Phải thành công trước khi có thể gọi bất kỳ API nào phụ thuộc vào
-        /// container (Login / Pay / Ads / Share). Trong Unity Editor (với SDK >= 1.1.1, DLL dành cho editor
+        /// container (Ads / Share / Shortcut). Trong Unity Editor (với SDK >= 1.1.1, DLL dành cho editor
         /// sẽ tự động tải và gọi thành công qua bản giả lập Mock); trong bản build WebGL thì nó sẽ giao tiếp với container thật.
         /// </summary>
         private void InitSdk()
@@ -382,31 +364,6 @@ namespace TikTokMiniGameDemo
 
         #endregion
 
-        #region Auth
-
-        /// <summary>
-        /// <c>TT.Login</c> — đổi phiên container lấy <c>code</c> có thời hạn ngắn, sau đó backend
-        /// của bạn dùng mã này lấy openid thông qua openapi của Douyin.
-        /// </summary>
-        private void DoLogin()
-        {
-            TT.Login(
-                code => Log($"  ← Login success, code={code}"),
-                errMsg => Log($"  ← Login failed: {errMsg}"));
-        }
-
-        /// <summary>
-        /// <c>TT.Authorize</c> — yêu cầu cấp quyền truy cập. "scope.userInfo" là quyền phổ biến nhất.
-        /// </summary>
-        private void DoAuthorize()
-        {
-            TT.Authorize("scope.userInfo",
-                ok => Log($"  ← Authorize ok: {ok}"),
-                (e, m) => Log($"  ← Authorize fail: {e} / {m}"));
-        }
-
-        #endregion
-
         #region Share
 
         /// <summary>
@@ -426,67 +383,6 @@ namespace TikTokMiniGameDemo
                 Success = () => Log("  ← Share success"),
                 Fail = err => Log($"  ← Share fail: {err?.ErrMsg}"),
                 Complete = () => Log("  ← Share complete"),
-            });
-        }
-
-        #endregion
-
-        #region Payment
-
-        /// <summary>
-        /// <c>TT.Pay</c> — thực hiện thanh toán với mã đơn hàng (trade order id) do backend của bạn trả về.
-        /// </summary>
-        private void DoPay()
-        {
-            TT.Pay(new TTPayParam
-            {
-                trade_order_id = "demo_order_001",
-                success = r => Log($"  ← Pay success: {r?.errMsg}"),
-                fail = err => Log($"  ← Pay fail: {err?.ErrMsg}"),
-                complete = r => Log("  ← Pay complete"),
-            });
-        }
-
-        /// <summary>
-        /// <c>TT.CheckBalance</c> — truy vấn xem người dùng có đủ tiền ảo (virtual currency) hay không.
-        /// </summary>
-        private void DoCheckBalance()
-        {
-            TT.CheckBalance(new TTCheckBalanceParam
-            {
-                amount = 1.0f,
-                type = "diamond",
-                success = r => Log($"  ← CheckBalance is_sufficient={r?.is_sufficient}"),
-                fail = err => Log($"  ← CheckBalance fail: {err?.ErrMsg}"),
-                complete = r => Log("  ← CheckBalance complete"),
-            });
-        }
-
-        /// <summary>
-        /// <c>TT.Recharge</c> — mở giao diện nạp tiền với một mức giá (tier id) được cấu hình trước.
-        /// </summary>
-        private void DoRecharge()
-        {
-            TT.Recharge(new TTRechargeParam
-            {
-                tier_id = "demo_tier",
-                success = r => Log($"  ← Recharge success: {r?.errMsg}"),
-                fail = err => Log($"  ← Recharge fail: {err?.ErrMsg}"),
-                complete = r => Log("  ← Recharge complete"),
-            });
-        }
-
-        /// <summary>
-        /// <c>TT.NavigateToBalance</c> — mở giao diện xem số dư / ví tiền của người dùng.
-        /// </summary>
-        private void DoNavigateToBalance()
-        {
-            TT.NavigateToBalance(new TTNavigateToBalanceParam
-            {
-                type = "diamond",
-                success = r => Log($"  ← NavigateToBalance success: {r?.errMsg}"),
-                fail = err => Log($"  ← NavigateToBalance fail: {err?.ErrMsg}"),
-                complete = r => Log("  ← NavigateToBalance complete"),
             });
         }
 
@@ -733,47 +629,6 @@ namespace TikTokMiniGameDemo
         {
             AmobearTTMNG.TikTokShortcut.ResetLocalLedger();
             Log("  ← Local shortcut ledger reset (trạng thái phía nền tảng không reset được)");
-        }
-
-        #endregion
-
-        #region HS (Login / IAP / Cloud)
-
-        private void DoHsStatus()
-        {
-            var sdk = HS.TikTokSDK.TikTokSDK.Instance;
-            Log(sdk == null
-                ? "  ← HS_TikTokSDK chưa có trong scene (đặt ở scene Setup bằng menu IAP TikTok Setup)"
-                : $"  ← HS ready={AmobearTTMNG.TikTokHS.IsReady} configured={sdk.IsConfigured} loggedIn={AmobearTTMNG.TikTokHS.IsLoggedIn} testMode={sdk.IsTestMode} cloudTs={AmobearTTMNG.TikTokHS.LastCloudTimestamp}");
-        }
-
-        private void DoHsLogin()
-        {
-            AmobearTTMNG.TikTokHS.StartLogin();
-            Log("  → HS StartLogin (kết quả ở log [HS])");
-        }
-
-        private void DoHsShopItems()
-        {
-            AmobearTTMNG.TikTokHS.GetShopItems((ok, items, error) =>
-                Log($"  ← HS shop ok={ok} count={items?.Count ?? 0} error={error}"));
-        }
-
-        private void DoHsBuy(string productId)
-        {
-            AmobearTTMNG.TikTokHS.BuyProduct(productId);
-            Log($"  → HS BuyProduct({productId}) — quà tới qua TikTokHS.OnRewardsGranted");
-        }
-
-        private void DoHsMarkDirty()
-        {
-            AmobearTTMNG.TikTokHS.MarkCloudDirty();
-            Log("  ← Cloud save marked dirty (SDK tự upload theo chu kỳ)");
-        }
-
-        private void DoHsSyncNow()
-        {
-            AmobearTTMNG.TikTokHS.SyncNow(ok => Log($"  ← HS SyncNow ok={ok}"));
         }
 
         #endregion

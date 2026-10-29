@@ -1,9 +1,12 @@
 # Amobear TikTok Mini Game (`com.amobear.ttmng`)
 
 Package dùng chung để đưa game Unity lên TikTok Mini Game: module runtime (InitSDK, storage, ads, shortcut / sidebar,
-share, safe area, mạng, rung, HS SDK tùy chọn) + công cụ Editor Setup → Validate → Build → `ttmg`. Cấu hình và luồng
-lấy từ game đã lên TikTok thật (pocket-2): Unity **2022.3.62f2**, TikTok Unity SDK **1.1.5-Release**, HS SDK C#
-**1.0.4** (login / IAP / cloud save). Quảng cáo gọi thẳng API TikTok theo Placement ID.
+share, safe area, mạng, rung) + công cụ Editor Setup → Validate → Build → `ttmg`. Cấu hình và luồng lấy từ game đã
+lên TikTok thật (pocket-2): Unity **2022.3.62f2**, TikTok Unity SDK **1.1.5-Release**. Quảng cáo gọi thẳng API TikTok
+theo Placement ID.
+
+**Template chỉ kiếm tiền bằng quảng cáo (IAA).** Không có login / IAP / cloud save, nên không cần backend hay domain
+riêng; dữ liệu game lưu cục bộ trong container (`TikTokStorage`).
 
 Mọi code nằm trong `namespace AmobearTTMNG` (ads: `AmobearTTMNG.Ads`, công cụ Editor: `AmobearTTMNG.EditorTools`).
 
@@ -16,41 +19,36 @@ Mọi code nằm trong `namespace AmobearTTMNG` (ads: `AmobearTTMNG.Ads`, công 
 1. **Import TTSDK TRƯỚC** — `com.tiktok.minigame@1.1.5-Release.unitypackage` (bản lưu trong repo TTMNGDoc ở
    `Package/`). Package này tham chiếu assembly `TTWebGL` của TTSDK nên thiếu TTSDK là không biên dịch được, kể cả
    menu Setup.
-2. *(Tùy chọn)* import HS SDK `com.hs.tiktok-sdk` nếu game dùng login / IAP bằng beans / cloud save.
-3. Thêm vào `Packages/manifest.json`:
+2. Thêm vào `Packages/manifest.json`:
    ```json
    "com.amobear.ttmng": "https://svn.as.local/tuanvhh/ttmngdoc.git?path=/TikTokMiniGame/TikTokMiniGame/Packages/com.amobear.ttmng#ttmng-v1.0.0"
    ```
-4. Menu **`AmobearTTMNG/Setup Project`** (chạy lại thoải mái):
+3. Menu **`AmobearTTMNG/Setup Project`** (chạy lại thoải mái):
    - chuyển sang WebGL + IL2CPP, bộ nhớ 128MB, tắt nén / data caching, bật bulk-memory;
    - `Assets/Editor/StarkBuilderSetting.asset`: output `<project>/tt-minigame`, WebGL2, bulk memory;
    - tạo `Assets/TikTokConfig/Resources/TikTokAdsConfig.asset` nếu chưa có;
-   - có HS SDK → bật define `AMOBEAR_TTMNG_HS` (assembly `AmobearTTMNG.HS`), không có → gỡ;
    - scene 0 chưa có `TikTokBootstrap` → đề nghị tạo `Assets/TikTokConfig/TikTokSetup.unity` làm scene 0, xong InitSDK
      thì chuyển sang scene game cũ (field `nextScene`);
    - App ID còn trống → mở cửa sổ **`AmobearTTMNG/Set App ID`**.
-5. Điền phần riêng của game (xem bảng mục 1.1): Placement ID quảng cáo (mục 5), HS `gameId` / `sdkKey` trên
-   `HS_TikTokSDK` ở scene 0 (menu **`IAP TikTok Setup/Setup SDK in Scene`**), sản phẩm IAP trên console HS (mẫu:
-   `Documentation~/tiktok_products.sample.json`), whitelist domain backend HS trên TikTok Developer Portal (login lỗi
-   `21100`).
-6. **`AmobearTTMNG/Validate Project`** — lỗi (✗) chặn build, cảnh báo (!) nên sửa.
-7. **`AmobearTTMNG/Build and Validate`** — gọi `TTSDK.Tool.Builder.BuildWebGL` rồi kiểm gói `tt-minigame/tt-minigame`:
+4. Điền Placement ID quảng cáo của game (mục 4).
+5. **`AmobearTTMNG/Validate Project`** — lỗi (✗) chặn build, cảnh báo (!) nên sửa.
+6. **`AmobearTTMNG/Build and Validate`** — gọi `TTSDK.Tool.Builder.BuildWebGL` rồi kiểm gói `tt-minigame/tt-minigame`:
    có `game.js` / `game.json` / `wasmcode/` / `data-package/`, `gameEngine = "unity"`, `sdkVersion`, `wasmFuncCount`
    (≥ 80000 → phải tách Wasm), tổng gói ≤ **60MB**.
-8. **`AmobearTTMNG/ttmg dev (QR preview)`** mở terminal tại thư mục gói để quét QR test máy thật;
+7. **`AmobearTTMNG/ttmg dev (QR preview)`** mở terminal tại thư mục gói để quét QR test máy thật;
    **`AmobearTTMNG/ttmg upload`** tạo bản test trên Developer Portal (luôn hỏi lại). Cần `npm i -g @ttmg/cli`.
    Chỉ upload thư mục gói này — không upload project Unity hay thư mục WebGL thường.
 
-> Mỗi game một bộ key riêng — không dùng lại App ID / Placement ID / Game ID / SDK Key của game khác.
+> Mỗi game một bộ key riêng — không dùng lại App ID / Placement ID của game khác.
 
 ### 1.1. Phần nào thuộc package, phần nào thuộc game
 
 | Thuộc package (cập nhật bằng cách đổi tag) | Thuộc từng game (nằm trong Assets / scene của game) |
 |---|---|
-| `Runtime/` (assembly `AmobearTTMNG.Runtime`) | `Assets/Plugins/com.tiktok.minigame` (TTSDK), `Assets/Plugins/com.hs.tiktok-sdk` (HS) |
-| `Runtime/HS/` (assembly `AmobearTTMNG.HS`, chỉ build khi có define) | `Assets/Editor/StarkBuilderSetting.asset` (App ID, output — TTSDK chỉ đọc đúng đường dẫn này) |
-| `Editor/` (menu `AmobearTTMNG/...`) | `Assets/TikTokConfig/Resources/TikTokAdsConfig.asset` (Placement ID) |
-| | Scene 0 có `TikTokBootstrap` (+ `HS_TikTokSDK` với gameId / sdkKey) |
+| `Runtime/` (assembly `AmobearTTMNG.Runtime`) | `Assets/Plugins/com.tiktok.minigame` (TTSDK) |
+| `Editor/` (menu `AmobearTTMNG/...`) | `Assets/Editor/StarkBuilderSetting.asset` (App ID, output — TTSDK chỉ đọc đúng đường dẫn này) |
+| | `Assets/TikTokConfig/Resources/TikTokAdsConfig.asset` (Placement ID) |
+| | Scene 0 có `TikTokBootstrap` |
 | | Phần thưởng: handler `OnRewardClaimed`, `ClaimPeriod`, `ServerClaim` |
 
 ### 1.2. Nâng / cố định phiên bản
@@ -67,7 +65,6 @@ TTSDK **1.1.5-Release**; Setup / Validate báo lỗi nếu khác. Đổi bản T
 | `TikTokBootstrap` | InitSDK, `WhenReady`, `WhenSdkReady`, `OnShow`/`OnHide`/`OnShowWithParams` | Xem mục 2.1. OnHide tự `TikTokStorage.Save()`. |
 | `TikTokStorage` | Key-value bền (`tt.setStorageSync`) | Probe ghi→đọc lúc khởi động, hỏng thì fallback PlayerPrefs. Chuỗi rỗng = xoá key. |
 | `TikTokFileSystem` | Ghi/đọc file trong container | `persistentDataPath` / C# file IO KHÔNG bền trên TikTok. Editor trả false/null. |
-| `TikTokHS` *(tùy chọn)* | Đăng nhập + IAP (beans) + cloud save | Chỉ có khi bật `AMOBEAR_TTMNG_HS`. Tự login lúc mở game. Quà tới qua `OnRewardsGranted`, KHÔNG cấp lúc gọi `BuyProduct`. |
 | `TikTokAds` + `TikTokAdsConfig` | Rewarded / Interstitial theo label | Gọi `TT.CreateRewardedVideoAd` / `TT.CreateInterstitialAd` với Placement ID trong config. Chặn sẵn luật 15s / 30s và ad chồng nhau. |
 | `TikTokShortcut` | Desktop Shortcut Revisit | Nhận quà hai bước. Mặc định nhận **một lần**. |
 | `TikTokSidebar` | Sidebar Revisit | Nhận quà hai bước. Mặc định **mỗi ngày một lần**. |
@@ -82,10 +79,10 @@ TTSDK **1.1.5-Release**; Setup / Validate báo lỗi nếu khác. Đổi bản T
 
 - `WhenReady(ok => ...)`: trả lời NGAY khi init có kết quả — sau timeout là `false`. Dùng cho lệnh người chơi bấm.
 - `WhenSdkReady(() => ...)`: chạy khi SDK sẵn sàng, **kể cả thành công sau timeout**. Dùng cho việc lúc khởi động cần
-  SDK (preload, gắn listener, đăng nhập). Các module trong package đã dùng nó: thưởng Shortcut / Sidebar được hỏi lại,
-  ads preload, mạng, safe area, HS login đều tự chạy lại.
+  SDK (preload, gắn listener). Các module trong package đã dùng nó: thưởng Shortcut / Sidebar được hỏi lại, ads
+  preload, mạng, safe area đều tự chạy lại.
 - `CheckSupported` (Shortcut / Sidebar / Share) có thể gọi callback **hai lần** (`false` rồi `true`) — UI bật / tắt
-  nút theo giá trị mới nhất. `TikTokHS.OnLoginResult` tương tự (`ttsdk_init_timeout` rồi kết quả thật).
+  nút theo giá trị mới nhất.
 
 ---
 
@@ -115,27 +112,7 @@ TikTokShortcut.OnRewardClaimed += period => Wallet.Add(500);
 - Test: DevTool launch mode `scene_shortcut` / `scene_center`. Icon thật chỉ mở **bản đã phát hành**.
   Editor: tick `Simulate … In Editor` trên `ShortcutDemo` khi đang Play.
 
-## 4. IAP (HS SDK)
-
-```csharp
-TikTokHS.OnRewardsGranted += (productId, rewards, source) =>
-{
-    foreach (var r in rewards)
-        switch (r.type) { case "coin": Wallet.Add(r.amount); break; case "no_ads": Profile.NoAds = true; break; }
-};
-TikTokHS.OnRewardsRevoked += (productId, rewards) => { /* trừ lại khi TikTok hoàn tiền */ };
-buyButton.onClick → TikTokHS.BuyProduct("coin_pack_small");
-
-// Cloud save (tuỳ chọn)
-TikTokHS.SerializeForCloud = () => JsonUtility.ToJson(save);
-TikTokHS.ApplyCloudData = (json, ts) => save = JsonUtility.FromJson<Save>(json);
-// sau mỗi lần save: TikTokHS.MarkCloudDirty();
-```
-
-- `source == "pending"`: đơn đã trả tiền ở phiên trước nhưng chưa kịp giao — vẫn phải cấp.
-- `TikTokReward.type` là chuỗi do console đặt — thêm case khi console thêm loại quà mới.
-
-## 5. Quảng cáo (theo https://developers.tiktok.com/docs/en/in-app-ads)
+## 4. Quảng cáo (theo https://developers.tiktok.com/docs/en/in-app-ads)
 
 **Lấy Placement ID (mỗi game một bộ riêng):**
 1. Organization đã bật + được duyệt **IAA** (Monetization → Feature enablement, chỉ admin; duyệt 1–2 ngày).
@@ -180,12 +157,13 @@ Mã lỗi chính thức của TikTok (Error Code Reference, phần IAA):
 | `30001` (show) | Người chơi đóng rewarded trước khi xem hết | Không thưởng, cho chơi tiếp |
 | `50000` + `inner_error_code` | Lỗi hệ thống (50001 client key sai, 50008 container đang pre-render...) | Gửi support kèm inner code |
 
-Khi duyệt bản phát hành (Acceptance Testing), TikTok yêu cầu có: **rewarded ad, IAP, Silent Login, Home Screen Shortcut, Revisit From Profile**.
-Quà shortcut phải **chỉ nhận được một lần**. Test quảng cáo thật thì tắt **Enable IAA Mock** trong DevTool.
+Khi duyệt bản phát hành (Acceptance Testing), checklist của TikTok có: **rewarded ad, IAP, Silent Login, Home Screen
+Shortcut, Revisit From Profile**. Template không có IAP / login — lúc Submit for review ghi chú cho reviewer: "game chỉ
+có quảng cáo, không có tài khoản / IAP, dữ liệu lưu cục bộ". Quà shortcut phải **chỉ nhận được một lần**. Test quảng cáo thật thì tắt **Enable IAA Mock** trong DevTool.
 
 ---
 
-## 6. Test trên máy thật (không tự động được)
+## 5. Test trên máy thật (không tự động được)
 
 - **Quét QR không vào được** (`ttmg dev` kẹt "connecting" / timeout): tài khoản quét phải nằm trong **Test User** của
   app; điện thoại và máy dev cùng mạng / cùng dải IP (Wi-Fi khách của công ty thường cách ly thiết bị); tắt VPN chế độ
@@ -199,7 +177,7 @@ Quà shortcut phải **chỉ nhận được một lần**. Test quảng cáo th
   cá nhân.
 - Quảng cáo thật: tắt **Enable IAA Mock** trong DevTool.
 
-## 7. Khi báo lỗi cho TikTok
+## 6. Khi báo lỗi cho TikTok
 
 Gửi một lần: ClientKey, Unity version, TikTok Unity SDK version, cấu trúc thư mục `tt-minigame`, dung lượng gói,
 có bật Wasm split không, TikTok App version, thiết bị + OS, SystemInfo, lỗi đầu tiên, build log, các bước tái hiện,

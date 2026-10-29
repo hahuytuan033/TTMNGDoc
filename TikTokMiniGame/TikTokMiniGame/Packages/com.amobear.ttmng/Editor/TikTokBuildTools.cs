@@ -91,12 +91,17 @@ namespace AmobearTTMNG.EditorTools
 		/// </summary>
 		public static void RunTtmg(string command)
 		{
-			string dir = TikTokEditorPaths.PackageDir(StarkBuilderSettings.LoadSettings());
+			StarkBuilderSettings settings = StarkBuilderSettings.LoadSettings();
+			string dir = TikTokEditorPaths.PackageDir(settings);
 			if (!File.Exists(Path.Combine(dir, "game.json")))
 			{
 				EditorUtility.DisplayDialog($"ttmg {command}", $"Chưa có gói ở {dir} — chạy AmobearTTMNG/Build and Validate.", "OK");
 				return;
 			}
+			// Gói TTSDK 1.1.5 không có project.config.json → truyền Client Key cho ttmg (-ck) thay vì để nó hỏi.
+			string appId = TikTokEditorPaths.ReadAppId(settings);
+			if (!string.IsNullOrEmpty(appId))
+				command += $" -ck {appId}";
 			if (!IsTtmgInstalled())
 			{
 				EditorUtility.DisplayDialog($"ttmg {command}", "Không tìm thấy ttmg trên PATH.\n\nCài bằng: npm i -g @ttmg/cli", "OK");
@@ -109,7 +114,7 @@ namespace AmobearTTMNG.EditorTools
 				Process.Start(new ProcessStartInfo("cmd.exe", $"/k ttmg {command}") { WorkingDirectory = dir, UseShellExecute = true });
 #elif UNITY_EDITOR_OSX
 				// File .command mở bằng Terminal; login shell để có PATH của npm global.
-				string scriptPath = Path.Combine(Path.GetTempPath(), $"ttmg_{command}.command");
+				string scriptPath = Path.Combine(Path.GetTempPath(), $"ttmg_{command.Split(' ')[0]}.command");
 				File.WriteAllText(scriptPath, $"#!/bin/zsh -l\ncd '{dir.Replace("'", "'\\''")}'\nttmg {command}\n");
 				Process.Start("chmod", $"+x \"{scriptPath}\"")?.WaitForExit(5000);
 				Process.Start("open", $"\"{scriptPath}\"");
