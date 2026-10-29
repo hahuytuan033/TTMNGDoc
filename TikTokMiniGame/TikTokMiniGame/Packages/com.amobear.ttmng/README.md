@@ -31,11 +31,16 @@ Mọi code nằm trong `namespace AmobearTTMNG` (ads: `AmobearTTMNG.Ads`, công 
    Tham số `-Ref` / đối số thứ 2 để chọn tag hoặc `master`. Xong thì commit `.gitmodules`, `TTMNG`, `manifest.json`.
 2. **Mở Unity → chọn Import** khi được hỏi TikTok SDK. TTSDK 1.1.5-Release đi kèm package (`TTSDK~/`), được import
    vào `Assets/Plugins/com.tiktok.minigame`. Bỏ qua thì dùng menu **`AmobearTTMNG/Install TikTok SDK`** sau.
+   CI / dòng lệnh (không kèm `-quit`, tự thoát khi import xong):
+   `Unity -batchmode -projectPath <game> -executeMethod AmobearTTMNG.Installer.TikTokSdkInstaller.InstallFromCommandLine`.
    - Các assembly `AmobearTTMNG.*` chỉ biên dịch khi có define `AMOBEAR_TTMNG_TTSDK`. Bộ cài (assembly riêng, không
      phụ thuộc TTSDK) tự thêm define này cho WebGL / Standalone / Android / iOS khi thấy TTSDK, gỡ khi không thấy.
    - **Chưa cài xong TTSDK thì đừng viết code gọi `AmobearTTMNG`** trong Assembly-CSharp: lỗi biên dịch ở đó chặn
      Editor reload nên bộ cài không chạy được. Lỡ gặp thì tạm comment code đó, hoặc tự thêm define trong
      Player Settings → Scripting Define Symbols.
+   - TTSDK trong `Assets/Plugins` là của game — **commit nó vào repo game**. Xoá / thêm TTSDK trong Unity thì define
+     tự cập nhật; xoá ngoài Unity (Explorer, git) mà define còn thì `AmobearTTMNG.*` báo thiếu `TTSDK` → gỡ
+     `AMOBEAR_TTMNG_TTSDK` trong Player Settings hoặc import lại TTSDK.
 3. Menu **`AmobearTTMNG/Setup Project`** (chạy lại thoải mái):
    - chuyển sang WebGL + IL2CPP, bộ nhớ 128MB, tắt nén / data caching, bật bulk-memory;
    - `Assets/Editor/StarkBuilderSetting.asset`: output `<project>/tt-minigame`, WebGL2, bulk memory;
@@ -97,6 +102,8 @@ Không cần submodule, không sửa được từ game:
 ### 1.5. Sample Demo
 
 Package Manager → **Amobear TikTok Mini Game** → **Samples** → **Demo** → Import (vào `Assets/Samples/…/Demo`).
+Game chưa có TMP Essentials thì Unity hỏi import khi mở scene demo (hoặc Window → TextMeshPro → Import TMP Essential
+Resources) — thiếu thì chữ trong demo không hiện.
 Menu **`AmobearTTMNG/Demo/Add Demo Scenes to Build`** thêm Setup / Demo / MainMenu vào cuối Build Settings; kéo
 Setup của demo lên index 0 để chạy thử Shortcut / Sidebar / Share / Ads và menu API trên máy thật. Xoá thư mục
 Sample + gỡ scene khỏi Build Settings trước khi build bản thật.
