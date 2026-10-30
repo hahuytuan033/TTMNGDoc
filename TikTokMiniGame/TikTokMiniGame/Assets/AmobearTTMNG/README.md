@@ -18,6 +18,10 @@ git submodule add -b sdk-assets <SDK_REPOSITORY_URL> Assets/AmobearTTMNG
 ```
 
 Mở Unity, chấp nhận import TTSDK rồi chạy `AmobearTTMNG/Setup Project` và `Validate Project`.
+Setup thêm `TikTokBootstrap` trực tiếp vào scene đầu tiên đang bật trong Build Settings, để `nextScene` trống.
+Không tạo scene/Camera mới hoặc thay đổi thứ tự build. Chạy lại tái sử dụng bootstrap đã có.
+Nếu chưa có scene được bật, Setup báo lỗi để bạn thêm scene game trước. Scene có thay đổi chưa lưu sẽ được hỏi lưu.
+Game vẫn chạy trong scene hiện tại trong lúc SDK khởi tạo; code cần SDK phải đợi `TikTokBootstrap.WhenReady(...)`.
 Không khai báo `com.amobear.ttmng` trong manifest.json và không giữ bản cũ trong Packages (trùng assembly/GUID).
 Demo có sẵn, nhưng không tự thêm vào Build Settings của game. Muốn chạy demo, dùng menu `AmobearTTMNG/Demo/Add Demo Scenes to Build`.
 Nếu chữ Demo thiếu, import TMP Essential Resources qua menu Window/TextMeshPro.
@@ -28,6 +32,16 @@ Setup giữ lại cấu hình Resources hợp lệ đã có, không tự ghi đ�
 Commit submodule pointer, `.gitmodules`, meta thư mục, manifest/lock và các cấu hình được sinh vào repo game.
 
 ## Cập nhật và clone
+
+Unity tự kiểm tra cập nhật sau khi mở project (khoảng 20 giây) và mỗi 30 phút khi không Play/compile.
+SDK phải là một Git checkout riêng tại Assets/AmobearTTMNG; máy cần Git và quyền truy cập origin (VPN nếu cần).
+Trình kiểm tra dùng nhánh submodule trong `.gitmodules` (ưu tiên override ở Git config); nếu không cấu hình thì dùng nhánh mặc định của origin.
+Popup hiện hash hiện tại/mới và nội dung tối đa 100 commit, đồng thời ghi Console log. Nút **Update SDK** chỉ fast-forward
+khi SDK không có thay đổi local. Không tự commit/push repo game, không tự chạy Setup và không cập nhật các plugin khác.
+Sau Update: chờ compile, chạy Validate, test game rồi commit con trỏ submodule. Chạy Setup nếu bản mới cần áp dụng thay đổi scene/config.
+Menu **AmobearTTMNG/Check for SDK Updates** cho phép kiểm tra ngay hoặc mở lại thông báo đã đóng.
+Mất mạng/thiếu quyền chỉ ghi cảnh báo; không chặn mở game. Batch mode không kiểm tra tự động.
+Các project dùng bản SDK cũ chưa có trình kiểm tra phải cập nhật thủ công một lần để nhận tính năng này.
 
 ```bash
 git clone --recurse-submodules <GAME_REPOSITORY_URL>

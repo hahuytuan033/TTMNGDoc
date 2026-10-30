@@ -6,6 +6,7 @@ using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace AmobearTTMNG.EditorTools
 {
@@ -25,7 +26,6 @@ namespace AmobearTTMNG.EditorTools
 		private const string LogPrefix = "[TikTokSetup]";
 		private const int WasmMemoryMB = 128;
 		private static readonly string AdsConfigPath = $"{TikTokEditorPaths.ConfigFolder}/Resources/{TikTokAdsConfig.ResourcePath}.asset";
-		private static readonly string SetupScenePath = $"{TikTokEditorPaths.ConfigFolder}/TikTokSetup.unity";
 
 		[MenuItem("AmobearTTMNG/Setup Project", false, 0)]
 		public static void Apply()
@@ -41,10 +41,11 @@ namespace AmobearTTMNG.EditorTools
 				return;
 			}
 
+			if (!EnsureBootstrapScene())
+				return;
 			ApplyPlayerSettings();
 			ApplyBuilderSetting();
 			EnsureAdsConfig();
-			EnsureBootstrapScene();
 			AssetDatabase.SaveAssets();
 
 			if (!Application.isBatchMode && string.IsNullOrEmpty(TikTokEditorPaths.ReadAppId(StarkBuilderSettings.LoadSettings())))
@@ -111,42 +112,72 @@ namespace AmobearTTMNG.EditorTools
 			Path.GetFileNameWithoutExtension(assetPath) == TikTokAdsConfig.ResourcePath
 			&& Path.GetFileName(Path.GetDirectoryName(assetPath)) == "Resources";
 
-		private static void EnsureBootstrapScene()
+		private static bool EnsureBootstrapScene()
 		{
-			string scene0 = TikTokEditorPaths.FirstBuildScene();
-			if (TikTokEditorPaths.SceneHasScript(scene0, typeof(TikTokBootstrap)))
+			if (EditorApplication.isPlayingOrWillChangePlaymode)
 			{
-				Debug.Log($"{LogPrefix} Scene 0 ({scene0}) has TikTokBootstrap.");
-				return;
+				Debug.LogError($"{LogPrefix} Stop Play mode before setting up the project.");
+				return false;
+			}
+			string scene0 = TikTokEditorPaths.FirstBuildScene();
+			if (string.IsNullOrEmpty(scene0) || !File.Exists(scene0))
+			{
+				Debug.LogError($"{LogPrefix} Add and enable the game's startup scene in Build Settings first.");
+				return false;
 			}
 
-			// Batch mode (CI): không có ai bấm dialog — tạo luôn.
-			if (!Application.isBatchMode && !EditorUtility.DisplayDialog("TikTok Setup",
-					$"Scene đầu tiên trong Build Settings ({scene0 ?? "không có"}) chưa có TikTokBootstrap — InitSDK phải chạy ở scene 0.\n\n" +
-					$"Tạo {SetupScenePath} có TikTokBootstrap, đặt làm scene 0, rồi chuyển tiếp sang scene game hiện tại?",
-					"Tạo", "Bỏ qua"))
-				return;
-			if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
-				return;
-
-			TikTokEditorPaths.EnsureFolder(TikTokEditorPaths.ConfigFolder);
-			var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-
-			var camera = new GameObject("Main Camera").AddComponent<Camera>();
-			camera.clearFlags = CameraClearFlags.SolidColor;
-			camera.backgroundColor = Color.black;
-
-			var bootstrap = new GameObject(nameof(TikTokBootstrap)).AddComponent<TikTokBootstrap>();
-			var so = new SerializedObject(bootstrap);
-			// InitSDK xong thì vào scene game đang đứng đầu Build Settings.
-			so.FindProperty("nextScene").stringValue = scene0 == null ? string.Empty : Path.GetFileNameWithoutExtension(scene0);
-			so.ApplyModifiedPropertiesWithoutUndo();
-
-			EditorSceneManager.SaveScene(scene, SetupScenePath);
-			var scenes = EditorBuildSettings.scenes.Where(s => s.path != SetupScenePath).ToList();
-			scenes.Insert(0, new EditorBuildSettingsScene(SetupScenePath, true));
-			EditorBuildSettings.scenes = scenes.ToArray();
-			Debug.Log($"{LogPrefix} Created {SetupScenePath} as scene 0 (nextScene={so.FindProperty("nextScene").stringValue}).");
+			var scene = SceneManager.GetSceneByPath(scene0);
+			bool openedHere = !scene.IsValid() || !scene.isLoaded;
+			if (!openedHere && scene.isDirty)
+			{
+				// Do not silently save the user's unrelated scene edits.
+				if (Application.isBatchMode || !EditorSceneManager.SaveModifiedScenesIfUserWantsTo(new[] { scene }))
+					return false;
+				if (scene.isDirty) return false;
+			}
+			if (openedHere)
+				scene = EditorSceneManager.OpenScene(scene0, OpenSceneMode.Additive);
+			try
+			{
+				var bootstraps = scene.GetRootGameObjects()
+					.SelectMany(root => root.GetComponentsInChildren<TikTokBootstrap>(true)).ToArray();
+				if (bootstraps.Length > 1)
+				{
+					Debug.LogError($"{LogPrefix} {scene0} has multiple TikTokBootstrap components; keep only one.");
+					return false;
+				}
+				var bootstrap = bootstraps.FirstOrDefault();
+				if (bootstrap == null)
+				{
+					var go = new GameObject(nameof(TikTokBootstrap));
+					SceneManager.MoveGameObjectToScene(go, scene);
+					bootstrap = go.AddComponent<TikTokBootstrap>();
+				}
+				else if (bootstrap.transform.parent != null)
+				{
+					// DontDestroyOnLoad in Awake requires a root object.
+					Debug.LogError($"{LogPrefix} Move TikTokBootstrap to the root of {scene0}, then run Setup again.");
+					return false;
+				}
+				bootstrap.gameObject.SetActive(true);
+				bootstrap.enabled = true;
+				var so = new SerializedObject(bootstrap);
+				so.FindProperty("nextScene").stringValue = string.Empty;
+				so.ApplyModifiedPropertiesWithoutUndo();
+				EditorSceneManager.MarkSceneDirty(scene);
+				if (!EditorSceneManager.SaveScene(scene))
+				{
+					Debug.LogError($"{LogPrefix} Could not save {scene0}.");
+					return false;
+				}
+				Debug.Log($"{LogPrefix} TikTokBootstrap ready in {scene0}; stays in the game scene after SDK initialization.");
+				return true;
+			}
+			finally
+			{
+				if (openedHere)
+					EditorSceneManager.CloseScene(scene, true);
+			}
 		}
 
 		internal static void SetString(SerializedObject so, string name, string value)
