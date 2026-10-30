@@ -1,5 +1,6 @@
 .claude/
 .tokensave/
+.artifacts/
 # Tài liệu TikTok tham khảo — chỉ giữ ở máy, không đưa lên remote
 /TikTokMiniGamesDevToolUsageGuide.md
 /TikTokMiniGamesDeveloperOptionsUsageGuide.md
