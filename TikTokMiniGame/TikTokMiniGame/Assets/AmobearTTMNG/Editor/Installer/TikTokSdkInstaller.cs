@@ -173,7 +173,18 @@ namespace AmobearTTMNG.Installer
 		private static string BundledPath()
 		{
 			PackageInfo info = PackageInfo.FindForAssembly(typeof(TikTokSdkInstaller).Assembly);
-			return info == null ? null : Path.Combine(info.resolvedPath, BundledFile);
+			if (info != null)
+				return Path.Combine(info.resolvedPath, BundledFile);
+			// Assets-based submodule: locate this script rather than relying on a UPM package.
+			foreach (string guid in AssetDatabase.FindAssets("TikTokSdkInstaller t:MonoScript"))
+			{
+				string scriptPath = AssetDatabase.GUIDToAssetPath(guid);
+				if (AssetDatabase.LoadAssetAtPath<MonoScript>(scriptPath)?.GetClass() != typeof(TikTokSdkInstaller))
+					continue;
+				string root = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(scriptPath), "../.."));
+				return Path.Combine(root, BundledFile);
+			}
+			return null;
 		}
 
 		private static void SyncDefine(bool enabled)

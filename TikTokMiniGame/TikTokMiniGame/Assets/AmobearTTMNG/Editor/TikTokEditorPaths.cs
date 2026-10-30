@@ -14,7 +14,7 @@ namespace AmobearTTMNG.EditorTools
 		public const string ExpectedSdkVersion = Installer.TikTokSdkInstaller.SdkVersion;
 
 		/// <summary>Mọi thứ riêng của game mà package tạo ra nằm ở đây (không nằm trong package).</summary>
-		public const string ConfigFolder = "Assets/TikTokConfig";
+		public const string ConfigFolder = "Assets/AmobearTTMNGConfig";
 
 		public const string SdkPackageJson = "Assets/Plugins/com.tiktok.minigame/package.json";
 

@@ -5,16 +5,15 @@ using UnityEngine;
 namespace AmobearTTMNG.DevTools
 {
 	/// <summary>
-	/// Chỉ dùng trong project dev TTMNGDoc: chép Assets/Demo (bản gốc) sang Samples~/Demo của package để game khác
-	/// import qua Package Manager. Chạy trước mỗi lần release (tag ttmng-v*). Giữ nguyên .meta để GUID script / scene
-	/// không đổi.
+	/// Snapshot Demo vào Temp để kiểm tra trong project dev. Phân phối SDK bằng tools/export-ttmng-sdk.ps1.
+	/// Giữ nguyên .meta để GUID script / scene không đổi.
 	/// </summary>
 	public static class DemoSampleSync
 	{
-		private const string Source = "Assets/Demo";
-		private const string Target = "Packages/com.amobear.ttmng/Samples~/Demo";
+		private const string Source = "Assets/AmobearTTMNG/Demo";
+		private const string Target = "Temp/AmobearDemoSnapshot";
 
-		[MenuItem("AmobearTTMNG/Dev/Sync Demo → Samples~", false, 300)]
+		[MenuItem("AmobearTTMNG/Dev/Snapshot Demo to Temp", false, 300)]
 		public static void Sync()
 		{
 			string root = Path.GetDirectoryName(Application.dataPath);

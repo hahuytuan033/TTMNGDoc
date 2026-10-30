@@ -40,3 +40,4 @@ crashlytics-build.properties
 
 # TTSDK đi kèm package (bộ cài tự import)
 !/Packages/com.amobear.ttmng/TTSDK~/*.unitypackage
+!/Assets/AmobearTTMNG/TTSDK~/*.unitypackage

@@ -15,7 +15,7 @@ namespace AmobearTTMNG.Ads
 	/// app → Operation → Monetization → In-App Ads (IAAs) → Add ad placement → chuyển Active → copy Placement ID.
 	///
 	/// Đặt asset tên <c>TikTokAdsConfig</c> trong một thư mục <c>Resources</c> của GAME (menu
-	/// AmobearTTMNG/Setup Project tạo sẵn ở Assets/TikTokConfig/Resources) — không đặt trong package vì mỗi game một bộ
+	/// AmobearTTMNG/Setup Project tạo sẵn ở Assets/AmobearTTMNGConfig/Resources) — không đặt trong submodule vì mỗi game một bộ
 	/// Placement ID. Game gọi ads theo label; đổi Placement ID không cần sửa code.
 	/// </summary>
 	[CreateAssetMenu(fileName = "TikTokAdsConfig", menuName = "AmobearTTMNG/TikTok Ads Config")]
