@@ -38,6 +38,22 @@ Commit submodule pointer, `.gitmodules`, meta thư mục, manifest/lock và các
 
 ## Setup nhanh button và popup trong scene game
 
+### Cách nhanh nhất: prefab trọn bộ
+
+Kéo `UI/Prefabs/TikTokFeatureUI.prefab` vào Canvas của game. Prefab chứa controller, ba button và ba popup đã nối sẵn; không chứa Camera, Canvas, EventSystem hay wallet Demo. Chọn `AmobearTikTokUI` để gán `OnRewardClaimed` cho từng tính năng. Canvas phải có GraphicRaycaster và scene cần EventSystem/input module hoạt động. Inspector báo thiếu các phần này và thiếu bootstrap. Có thể dùng nút **Select complete TikTokFeatureUI prefab** trong cửa sổ Setup để tìm nhanh asset.
+
+Chỉnh layout, nội dung và hàm thưởng trên **instance trong scene của game**, không sửa prefab gốc bên trong submodule. Prefab instance giữ các override của game; các thuộc tính chưa override sẽ theo bản prefab SDK khi cập nhật. Không cần thêm OnClick thủ công: controller đăng ký/hủy listener lúc enable/disable.
+
+### Game đã có button/popup: Connect / Repair
+
+Mở **AmobearTTMNG → Setup Feature UI → Kết nối UI có sẵn / Repair References**. Chọn Canvas/parent (hoặc controller hiện có), tick tính năng cần nối và kéo entry button, popup, Title/Description TMP, action, background-close và close button vào các ô. Mỗi popup cần đủ các thành phần này; với UI custom dùng tên khác, gán trực tiếp.
+
+**Suggest missing references** chỉ điền ô trống khi tìm được đúng một đối tượng khớp tên bên trong popup đã chọn; không sửa scene. Kiểm tra các ô rồi bấm **Connect / Repair**. Công cụ giữ nguyên layout, nội dung, UnityEvent thưởng và OnClick có sẵn; cảnh báo nếu button đã có callback Inspector để dev kiểm tra tránh gọi API hai lần. Không gán một button/popup cho nhiều tính năng, không nối qua scene khác.
+
+Connect chỉ thêm controller/view còn thiếu và cập nhật các tham chiếu được chọn; bỏ tick không xóa tính năng. Có Undo/Redo, không tự lưu scene hoặc đổi Build Settings. Trong Inspector controller, **Repair References** mở lại cùng cửa sổ với dữ liệu hiện có; **Select Button / Select Popup** chọn đúng object để sửa giao diện. Nếu đang dùng UI copy từ Demo, dùng Connect thay vì chỉ copy Canvas — Canvas Demo không chứa controller xử lý các nút.
+
+### Tạo UI mẫu theo từng tính năng
+
 1. Mở scene muốn đặt UI và đặt scene đó **active** nếu đang mở additive.
 2. Chọn Canvas hoặc RectTransform con làm nơi đặt nhóm button. Với nhiều Canvas, phải chọn rõ Canvas/parent.
 3. Mở **AmobearTTMNG → Setup Feature UI**, chọn Shortcut, Revisit Sidebar, Share và tùy chọn **Tự mở popup Claim** (mặc định bật cả ba và tự mở).

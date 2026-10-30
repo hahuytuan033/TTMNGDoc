@@ -30,6 +30,10 @@ namespace AmobearTTMNG.EditorTools
 
         private void OnGUI()
         {
+            if (GUILayout.Button("Kết nối UI có sẵn / Repair References")) TikTokFeatureConnect.OpenWindow();
+            if (GUILayout.Button("Select complete TikTokFeatureUI prefab"))
+                Selection.activeObject = AssetDatabase.LoadAssetAtPath<GameObject>(SdkRoot + "/UI/Prefabs/TikTokFeatureUI.prefab");
+            EditorGUILayout.Space();
             EditorGUILayout.LabelField("Scene: " + SceneManager.GetActiveScene().name, EditorStyles.boldLabel);
             parent = (RectTransform)EditorGUILayout.ObjectField("Canvas / UI parent", parent, typeof(RectTransform), true);
             shortcut = EditorGUILayout.Toggle("Shortcut", shortcut);
@@ -193,7 +197,7 @@ namespace AmobearTTMNG.EditorTools
             }
         }
 
-        private static Type ResolveInputModule()
+        internal static Type ResolveInputModule()
         {
             var settings = new SerializedObject(AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/ProjectSettings.asset").First());
             int handling = settings.FindProperty("activeInputHandler")?.intValue ?? 0;
