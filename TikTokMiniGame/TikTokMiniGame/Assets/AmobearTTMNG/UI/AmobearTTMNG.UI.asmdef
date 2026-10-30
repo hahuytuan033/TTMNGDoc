@@ -1,0 +1,7 @@
+{
+  "name": "AmobearTTMNG.UI",
+  "rootNamespace": "AmobearTTMNG.UI",
+  "references": ["AmobearTTMNG.Runtime", "Unity.ugui", "Unity.TextMeshPro"],
+  "defineConstraints": ["AMOBEAR_TTMNG_TTSDK"],
+  "autoReferenced": true
+}

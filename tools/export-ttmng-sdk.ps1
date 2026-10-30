@@ -1,20 +1,24 @@
 <# Export a standalone local SDK Git repo; does not commit the dev repo or push. #>
-param([string]$Output = (Join-Path $PSScriptRoot '../.artifacts/AmobearTTMNG-SDK'))
+param([string]$Output = (Join-Path $PSScriptRoot '../.artifacts/AmobearTTMNG-SDK'), [switch]$FilesOnly)
 $ErrorActionPreference = 'Stop'
 $source = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../TikTokMiniGame/TikTokMiniGame/Assets/AmobearTTMNG'))
 $destination = [IO.Path]::GetFullPath($Output)
 if (Test-Path -LiteralPath $destination) { throw "Output exists; use a new -Output: $destination" }
-foreach ($name in @('Runtime','Editor','TTSDK~','Demo')) {
+foreach ($name in @('Runtime','Editor','UI','TTSDK~','Demo')) {
     if (!(Test-Path -LiteralPath (Join-Path $source $name))) { throw "Missing SDK source: $name" }
 }
 if (Test-Path -LiteralPath (Join-Path $source 'Editor/StarkBuilderSetting.asset')) { throw 'Move game-specific settings out of SDK first.' }
 New-Item -ItemType Directory -Path $destination -Force | Out-Null
-foreach ($name in @('Runtime','Editor','TTSDK~','Demo','Runtime.meta','Editor.meta','Demo.meta','README.md','README.md.meta','CHANGELOG.md','CHANGELOG.md.meta')) {
+foreach ($name in @('Runtime','Editor','UI','TTSDK~','Demo','Runtime.meta','Editor.meta','UI.meta','Demo.meta','README.md','README.md.meta','CHANGELOG.md','CHANGELOG.md.meta')) {
     $path = Join-Path $source $name
     if (Test-Path -LiteralPath $path) { Copy-Item -LiteralPath $path -Destination (Join-Path $destination $name) -Recurse }
 }
 [IO.File]::WriteAllText((Join-Path $destination '.gitignore'), "*.csproj`n*.sln`n.DS_Store`n")
 $gitExecutable = (Get-Command git -CommandType Application).Source
+if ($FilesOnly) {
+    Write-Host "SDK files ready (no Git init/commit): $destination"
+    return
+}
 function Git { & $gitExecutable -C $destination @args; if ($LASTEXITCODE -ne 0) { throw "git failed: $args" } }
 Git init -b sdk-assets
 Git add --all

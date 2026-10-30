@@ -1,0 +1,7 @@
+{
+  "name": "AmobearTTMNG.DevTools",
+  "references": ["AmobearTTMNG.Demo", "AmobearTTMNG.UI", "AmobearTTMNG.Runtime", "AmobearTTMNG.Editor", "Unity.TextMeshPro", "Unity.ugui"],
+  "includePlatforms": ["Editor"],
+  "defineConstraints": ["AMOBEAR_TTMNG_TTSDK"],
+  "autoReferenced": true
+}

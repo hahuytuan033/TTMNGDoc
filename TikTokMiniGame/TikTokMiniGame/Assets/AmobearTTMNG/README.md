@@ -1,6 +1,6 @@
 # AmobearTTMNG — Unity SDK trong Assets
 
-Code dùng chung nằm trực tiếp trong `Assets/AmobearTTMNG`: `Runtime/`, `Editor/`, `Demo/` và `TTSDK~/` (bộ cài TikTok).
+Code dùng chung nằm trực tiếp trong `Assets/AmobearTTMNG`: `Runtime/`, `Editor/`, `UI/`, `Demo/` và `TTSDK~/` (bộ cài TikTok).
 Unity 2022.3; cần packages `com.unity.ugui` và `com.unity.textmeshpro`.
 
 ## Cài vào game khác
@@ -29,7 +29,31 @@ Nếu chữ Demo thiếu, import TMP Essential Resources qua menu Window/TextMes
 Hai đường dẫn TTSDK bắt buộc giữ nguyên: `Assets/Plugins/com.tiktok.minigame` và `Assets/Editor/StarkBuilderSetting.asset`.
 Cấu hình của từng game được tạo ở `Assets/AmobearTTMNGConfig` ngoài submodule để không chia sẻ App ID/Placement ID.
 Setup giữ lại cấu hình Resources hợp lệ đã có, không tự ghi đè ID.
+Validate Project kiểm tra đủ **Ads (Rewarded + Interstitial), Revisit Sidebar, Shortcut và Share**:
+- Thiếu/đa cấu hình Ads, thiếu placement hợp lệ, label trùng, ID dùng cho hai loại, thời gian không hợp lệ → Error (chặn Build and Validate).
+- Tìm lời gọi API trong source của assembly Player dưới Assets, loại SDK/Editor/Demo đi kèm, Plugins và Samples. Không thấy lời gọi → Warning, vì alias/DLL/reflection có thể không được nhận diện.
+- Có lời gọi chỉ là bằng chứng tĩnh, không xác nhận nút UI đã nối, scene build có dùng code hoặc tính năng chạy trên thiết bị.
+- Báo cáo luôn kèm checklist test máy thật cho ads, sidebar, shortcut và share; không tự xác nhận trạng thái Portal hay phần thưởng.
 Commit submodule pointer, `.gitmodules`, meta thư mục, manifest/lock và các cấu hình được sinh vào repo game.
+
+## Setup nhanh button và popup trong scene game
+
+1. Mở scene muốn đặt UI và đặt scene đó **active** nếu đang mở additive.
+2. Chọn Canvas hoặc RectTransform con làm nơi đặt nhóm button. Với nhiều Canvas, phải chọn rõ Canvas/parent.
+3. Mở **AmobearTTMNG → Setup Feature UI**, chọn Shortcut, Revisit Sidebar, Share và tùy chọn **Tự mở popup Claim** (mặc định bật cả ba và tự mở).
+4. Bấm **Add to Current Scene**. Nếu chưa có Canvas, công cụ tạo Overlay Canvas tham chiếu 1080×1920; giữ nguyên CanvasScaler có sẵn. EventSystem hiện hữu được tái sử dụng; nếu thiếu, tạo input module theo Input Handling.
+5. Chọn `AmobearTikTokUI`. Trong Inspector, gán hàm cấp thưởng của game vào **OnRewardClaimed** của từng tính năng, sửa **RewardDescription**; Share có query/title/image URL riêng.
+6. Chỉnh button dưới nhóm `AmobearTikTokUI`, popup dưới `AmobearTikTokPopups` trên Canvas, rồi tự lưu scene.
+
+Ví dụ: kéo component quản lý thưởng của game vào OnRewardClaimed → chọn hàm `public void GrantShortcutReward()`. SDK không quyết định loại quà/số lượng và không cộng 100 coin Demo. Handler phải tồn tại và không ở trạng thái Off; thiếu handler thì Claim bị khóa, quyền nhận quà vẫn giữ nguyên. Chỉ callback Claim thành công từ module mới gọi event. Không đồng thời cấp cùng phần thưởng qua event toàn cục của module để tránh cộng hai lần. Với Claim bất đồng bộ, giữ đối tượng nhận thưởng sống đến khi callback hoàn tất.
+
+UI chờ SDK khởi tạo, kiểm tra hỗ trợ trước khi bật nút. Popup hướng dẫn dùng Start/Share; khi đủ điều kiện chuyển sang Claim. Các Claim chờ được mở lần lượt **Shortcut → Sidebar → Share**. Đóng popup sẽ không tự bật lại ngay; vẫn mở lại bằng nút tính năng. Lỗi thao tác/Claim hiển thị để thử lại.
+
+Setup chỉ sửa scene active, hỗ trợ Undo/Redo, không tự lưu, không đổi Build Settings và không chạy Setup Project. Chạy lại chỉ thêm tính năng còn thiếu; bỏ tick không xóa UI cũ, không đổi layout/nội dung/event đã chỉnh. UI được sao chép vào scene nên cập nhật submodule không tự ghi đè UI đã tùy chỉnh. Không dùng công cụ trong Play Mode hoặc Prefab Stage.
+
+Chạy **Setup Project** riêng nếu game chưa có bootstrap tại scene đầu. **Validate Project** nhận diện UI trong scene build, kể cả prefab instance, kiểm tra tham chiếu, handler và controller trùng. Chỉ bật một controller TikTok UI khi load additive. Kết quả kiểm tra tĩnh không thay thế kiểm thử trên TikTok thật.
+
+`UI/` chứa prefab, script, font, giấy phép font, shader và hình hướng dẫn dùng chung; công cụ export bao gồm toàn bộ thư mục này. Cần cài UGUI/TMP và import TMP Essential Resources nếu Unity yêu cầu. Nếu game dùng assembly riêng, thêm reference `AmobearTTMNG.UI` khi truy cập component bằng code.
 
 ## Cập nhật và clone
 

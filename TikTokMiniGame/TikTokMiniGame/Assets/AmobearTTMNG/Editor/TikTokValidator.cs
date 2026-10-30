@@ -99,6 +99,7 @@ namespace AmobearTTMNG.EditorTools
 			CheckRootProjectConfig(report, appId);
 			CheckBootstrapScene(report);
 			CheckAdsConfig(report);
+			TikTokFeatureValidation.Check(report);
 
 			if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.WebGL)
 				report.Info("Build target chưa phải WebGL — Build sẽ tự chuyển.");
@@ -128,25 +129,25 @@ namespace AmobearTTMNG.EditorTools
 
 		private static void CheckAdsConfig(TikTokValidationReport report)
 		{
-			string path = AssetDatabase.FindAssets($"t:{nameof(TikTokAdsConfig)}")
+			var paths = AssetDatabase.FindAssets($"t:{nameof(TikTokAdsConfig)}")
 				.Select(AssetDatabase.GUIDToAssetPath)
-				.FirstOrDefault(TikTokProjectSetup.IsLoadableAdsConfig);
-			if (path == null)
+				.Where(TikTokProjectSetup.IsLoadableAdsConfig).ToArray();
+			if (paths.Length == 0)
 			{
-				report.Warning("Không có Resources/TikTokAdsConfig — mọi quảng cáo coi như không có. Chạy AmobearTTMNG/Setup Project.");
+				report.Error("[Ads] Không có Resources/TikTokAdsConfig — chạy Setup Project và khai báo Rewarded + Interstitial.");
 				return;
 			}
+			if (paths.Length > 1)
+			{
+				report.Error("[Ads] Có nhiều Resources/TikTokAdsConfig, không xác định được cấu hình runtime: " + string.Join(", ", paths));
+				return;
+			}
+			string path = paths[0];
 			if (path.StartsWith("Packages/"))
 				report.Warning($"{path} nằm trong package — Placement ID là của từng game, chuyển sang Assets.");
 
 			var config = AssetDatabase.LoadAssetAtPath<TikTokAdsConfig>(path);
-			var empty = config.Placements.Where(p => p != null && string.IsNullOrEmpty(p.PlacementId)).Select(p => p.Label).ToList();
-			if (config.Placements.Count == 0)
-				report.Info($"{path}: chưa khai báo placement nào (game không có quảng cáo?).");
-			else if (empty.Count > 0)
-				report.Warning($"{path}: placement chưa có Placement ID: {string.Join(", ", empty)}.");
-			else
-				report.Info($"{path}: {config.Placements.Count} placement.");
+			TikTokFeatureValidation.CheckAdsPlacements(report, config, path);
 		}
 
 		[Serializable]
