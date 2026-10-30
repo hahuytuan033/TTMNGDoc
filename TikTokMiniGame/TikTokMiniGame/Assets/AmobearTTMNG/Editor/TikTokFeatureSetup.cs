@@ -30,6 +30,8 @@ namespace AmobearTTMNG.EditorTools
 
         private void OnGUI()
         {
+            if (GUILayout.Button("Select TikTokFeatureCanvas prefab (drag into scene)"))
+                Selection.activeObject = AssetDatabase.LoadAssetAtPath<GameObject>(SdkRoot + "/UI/Prefabs/TikTokFeatureCanvas.prefab");
             if (GUILayout.Button("Kết nối UI có sẵn / Repair References")) TikTokFeatureConnect.OpenWindow();
             if (GUILayout.Button("Select complete TikTokFeatureUI prefab"))
                 Selection.activeObject = AssetDatabase.LoadAssetAtPath<GameObject>(SdkRoot + "/UI/Prefabs/TikTokFeatureUI.prefab");

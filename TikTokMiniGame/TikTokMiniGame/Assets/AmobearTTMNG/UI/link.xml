@@ -1,0 +1,6 @@
+<linker>
+  <!-- Optional package: the Canvas input helper creates this module only in Input System-only builds. -->
+  <assembly fullname="Unity.InputSystem" ignoreIfMissing="1">
+    <type fullname="UnityEngine.InputSystem.UI.InputSystemUIInputModule" preserve="all" />
+  </assembly>
+</linker>

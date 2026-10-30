@@ -5,6 +5,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public static class BuildCompleteFeaturePrefab
 {
@@ -44,4 +45,30 @@ public static class BuildCompleteFeaturePrefab
         finally { EditorSceneManager.ClosePreviewScene(scene); }
     }
     static void Stretch(RectTransform r) { r.anchorMin = Vector2.zero; r.anchorMax = Vector2.one; r.offsetMin = r.offsetMax = Vector2.zero; r.localScale = Vector3.one; }
+
+    public static string ExecuteCanvas()
+    {
+        const string folder = "Assets/AmobearTTMNG/UI/Prefabs/";
+        var scene = EditorSceneManager.NewPreviewScene();
+        try
+        {
+            var source = AssetDatabase.LoadAssetAtPath<GameObject>(folder + "TikTokFeatureUI.prefab");
+            if (!source) throw new Exception("Generate TikTokFeatureUI.prefab first.");
+            var go = UnityEngine.Object.Instantiate(source);
+            SceneManager.MoveGameObjectToScene(go, scene);
+            go.name = "TikTokFeatureCanvas";
+            var canvas = go.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 100;
+            var scaler = go.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1080, 1920);
+            scaler.matchWidthOrHeight = 0.5f;
+            go.AddComponent<GraphicRaycaster>();
+            go.AddComponent<TikTokUIInput>();
+            PrefabUtility.SaveAsPrefabAsset(go, folder + "TikTokFeatureCanvas.prefab");
+            return "Created TikTokFeatureCanvas: Canvas/scaler/raycaster, three complete features and automatic runtime input fallback.";
+        }
+        finally { EditorSceneManager.ClosePreviewScene(scene); }
+    }
 }

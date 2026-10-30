@@ -22,7 +22,9 @@ namespace AmobearTTMNG.EditorTools
                     EditorGUILayout.HelpBox("Có nhiều controller trong scene. Chỉ bật một bộ UI.", MessageType.Error);
                 var events = UnityEngine.Object.FindObjectOfType<EventSystem>();
                 if (!events || !events.GetComponents<BaseInputModule>().Any(m => m.isActiveAndEnabled))
-                    EditorGUILayout.HelpBox("Thiếu EventSystem/input module đang hoạt động. Kiểm tra input trước khi thử click.", MessageType.Warning);
+                    EditorGUILayout.HelpBox(!events && ui.GetComponent<TikTokUIInput>()
+                        ? "Canvas sẽ tự tạo EventSystem khi chạy nếu scene chưa có."
+                        : "Thiếu EventSystem/input module đang hoạt động. Kiểm tra input trước khi thử click.", MessageType.Info);
                 if (!ui.GetComponentInParent<Canvas>(true))
                     EditorGUILayout.HelpBox("Đặt bộ UI dưới Canvas của game.", MessageType.Error);
                 else if (!ui.GetComponentInParent<Canvas>(true).GetComponent<GraphicRaycaster>())

@@ -38,7 +38,13 @@ Commit submodule pointer, `.gitmodules`, meta thư mục, manifest/lock và các
 
 ## Setup nhanh button và popup trong scene game
 
-### Cách nhanh nhất: prefab trọn bộ
+### Cách nhanh nhất: kéo Canvas vào scene
+
+Kéo **`Assets/AmobearTTMNG/UI/Prefabs/TikTokFeatureCanvas.prefab`** từ Project vào Hierarchy của scene game (đặt ở scene root). Đã có sẵn Canvas Overlay, CanvasScaler 1080×1920, GraphicRaycaster, controller, ba button và ba popup nối đầy đủ. Không cần chạy Setup Feature UI/Connect hoặc gán OnClick. Khi chạy, prefab tái sử dụng EventSystem đang có; nếu thiếu, tự tạo EventSystem với input module theo Input Handling. Canvas mặc định sorting order 100, có thể chỉnh trong Inspector.
+
+Chọn `TikTokFeatureCanvas` để chỉnh giao diện và gán **OnRewardClaimed** của game. Button mở hướng dẫn hoạt động sẵn; Claim chỉ bật sau khi có handler thưởng hợp lệ. Bootstrap SDK vẫn được cài bằng Setup Project tại scene đầu, độc lập với Canvas. Prefab không tự cấp coin hoặc khởi tạo thêm bootstrap. Lưu scene/override ở repo game để không sửa asset gốc trong submodule.
+
+### Nếu muốn dùng Canvas có sẵn
 
 Kéo `UI/Prefabs/TikTokFeatureUI.prefab` vào Canvas của game. Prefab chứa controller, ba button và ba popup đã nối sẵn; không chứa Camera, Canvas, EventSystem hay wallet Demo. Chọn `AmobearTikTokUI` để gán `OnRewardClaimed` cho từng tính năng. Canvas phải có GraphicRaycaster và scene cần EventSystem/input module hoạt động. Inspector báo thiếu các phần này và thiếu bootstrap. Có thể dùng nút **Select complete TikTokFeatureUI prefab** trong cửa sổ Setup để tìm nhanh asset.
 
