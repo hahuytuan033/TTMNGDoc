@@ -19,7 +19,7 @@ namespace AmobearTTMNG.Ads
 	/// Vị trí đặt ad là việc của game: interstitial chỉ ở chỗ nghỉ tự nhiên (hết màn, chuyển scene), KHÔNG giữa lúc
 	/// đang chơi; rewarded chỉ khi người chơi tự bấm nút có ghi rõ phần thưởng.
 	///
-	/// Editor: không có container — giả lập "xem hết" (hoặc "không có ad" khi bật <see cref="EditorSimulateNoFill"/>).
+	/// Editor: hiển thị UI mock của TTSDK để chọn xem hết / đóng sớm / lỗi.
 	/// Test thật: DevTool → tắt Enable IAA Mock.
 	/// </summary>
 	public static class TikTokAds
@@ -104,11 +104,18 @@ namespace AmobearTTMNG.Ads
 				return;
 			}
 
+#if UNITY_EDITOR
+			if (EditorSimulateNoFill)
+			{
+				RewardUnavailable(label, "editor_no_fill");
+				return;
+			}
+#endif
 			IsShowingReward = true;
 			BeginAd();
 			Log($"show rewarded label={label}");
 
-#if UNITY_EDITOR || !UNITY_WEBGL
+#if !UNITY_EDITOR && !UNITY_WEBGL
 			EndAd();
 			IsShowingReward = false;
 			if (EditorSimulateNoFill)
@@ -116,7 +123,7 @@ namespace AmobearTTMNG.Ads
 			else
 				RewardGranted(label, complete);
 #else
-			TikTokBootstrap.WhenReady(sdkReady =>
+			WhenAdsReady(sdkReady =>
 			{
 				if (!sdkReady)
 				{
@@ -164,20 +171,22 @@ namespace AmobearTTMNG.Ads
 				return;
 			}
 
-#if UNITY_EDITOR || !UNITY_WEBGL
+#if !UNITY_EDITOR && !UNITY_WEBGL
 			Log($"show interstitial (editor) label={label}");
 			SafeInvoke(complete);
 #else
+#if !UNITY_EDITOR
 			if (!TTAdsProvider.CanShowInterstitial(config, out string ruleReason))
 			{
 				InterstitialSkipped(label, ruleReason, complete);
 				return;
 			}
+#endif
 
 			IsShowingInterstitial = true;
 			BeginAd();
 			Log($"show interstitial label={label}");
-			TikTokBootstrap.WhenReady(sdkReady =>
+			WhenAdsReady(sdkReady =>
 			{
 				if (!sdkReady)
 				{
@@ -204,6 +213,36 @@ namespace AmobearTTMNG.Ads
 		}
 
 		// ---------------------------------------------------------------- helpers
+
+		private static void WhenAdsReady(Action<bool> callback)
+		{
+#if UNITY_EDITOR
+			// Also works when entering Play directly in Demo without the Setup scene.
+			// Initialize on demand: SDK mock loading opens interactive dialogs.
+			bool completed = false;
+			int timeoutId = 0;
+			void Finish(bool ready)
+			{
+				if (completed) return;
+				completed = true;
+				AdsTimeoutRunner.Cancel(timeoutId);
+				callback(ready);
+			}
+			timeoutId = AdsTimeoutRunner.Schedule(8f, () => Finish(false));
+			try
+			{
+				TTSDK.MockSetting.SwithMockModule(TTSDK.MockModule.Ad, true);
+				TTSDK.TT.InitSDK((code, env) => Finish(code == 0));
+			}
+			catch (Exception e)
+			{
+				Debug.LogError($"{LogPrefix} Editor mock initialization failed: {e.Message}");
+				Finish(false);
+			}
+#else
+			TikTokBootstrap.WhenReady(callback);
+#endif
+		}
 
 		private static bool TryResolve(string label, TikTokAdType type, out TikTokAdsConfig config, out string placementId, out string reason)
 		{

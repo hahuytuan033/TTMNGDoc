@@ -17,7 +17,7 @@ namespace AmobearTTMNG.Ads
 	///   không show trong 15s đầu sau khi module ads khởi động, hai lần cách nhau ≥ 30s.
 	///
 	/// Cam kết: mỗi lần Show gọi ĐÚNG MỘT callback (kể cả khi container im lặng — có timeout), để lọt là game
-	/// treo ở popup chờ thưởng. Chỉ chạy trên container; Editor do <see cref="TikTokAds"/> giả lập.
+	/// treo ở popup chờ thưởng. Chạy trên container hoặc UI mock của TTSDK trong Editor.
 	/// </summary>
 	internal static class TTAdsProvider
 	{
