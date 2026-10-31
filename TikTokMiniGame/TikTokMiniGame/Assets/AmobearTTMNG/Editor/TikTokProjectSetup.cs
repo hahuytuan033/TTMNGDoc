@@ -43,8 +43,8 @@ namespace AmobearTTMNG.EditorTools
 
 			if (!EnsureBootstrapScene())
 				return;
-			ApplyPlayerSettings();
-			ApplyBuilderSetting();
+			bool bulkMemory = ApplyBuilderSetting();
+			ApplyPlayerSettings(bulkMemory);
 			EnsureAdsConfig();
 			AssetDatabase.SaveAssets();
 
@@ -53,7 +53,7 @@ namespace AmobearTTMNG.EditorTools
 			Debug.Log($"{LogPrefix} Done. Next: AmobearTTMNG/Validate Project, then AmobearTTMNG/Build and Validate.");
 		}
 
-		private static void ApplyPlayerSettings()
+		private static void ApplyPlayerSettings(bool bulkMemory)
 		{
 			if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.WebGL)
 				EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.WebGL, BuildTarget.WebGL);
@@ -63,19 +63,29 @@ namespace AmobearTTMNG.EditorTools
 			PlayerSettings.WebGL.memorySize = WasmMemoryMB;
 			PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Disabled;
 			PlayerSettings.WebGL.dataCaching = false;
-			PlayerSettings.WebGL.emscriptenArgs = $" -s TOTAL_MEMORY={WasmMemoryMB}MB -mbulk-memory";
-			PlayerSettings.SetAdditionalIl2CppArgs("--compiler-flags=\"-mbulk-memory\"");
-			Debug.Log($"{LogPrefix} PlayerSettings.WebGL: IL2CPP, memory={WasmMemoryMB}MB, compression=Disabled, dataCaching=off, bulk-memory on.");
+			PlayerSettings.WebGL.emscriptenArgs = $" -s TOTAL_MEMORY={WasmMemoryMB}MB" + (bulkMemory ? " " + BulkMemoryFlag : string.Empty);
+			// Build của TTSDK tự thêm cờ khi enableBulkMemory bật nhưng lúc tắt chỉ gỡ cờ IL2CPP, không gỡ emscriptenArgs
+			// (đã kiểm ttsdk_tools.dll 1.1.5) — nên Setup phải tự đồng bộ cả hai. Giữ các tham số IL2CPP khác của game.
+			string il2cppArgs = (PlayerSettings.GetAdditionalIl2CppArgs() ?? string.Empty).Replace(BulkMemoryIl2CppArg, string.Empty).Trim();
+			if (bulkMemory)
+				il2cppArgs = (il2cppArgs + " " + BulkMemoryIl2CppArg).Trim();
+			PlayerSettings.SetAdditionalIl2CppArgs(il2cppArgs);
+			Debug.Log($"{LogPrefix} PlayerSettings.WebGL: IL2CPP, memory={WasmMemoryMB}MB, compression=Disabled, dataCaching=off, bulk-memory {(bulkMemory ? "on" : "off")}.");
 		}
 
-		private static void ApplyBuilderSetting()
+		internal const string BulkMemoryFlag = "-mbulk-memory";
+		internal const string BulkMemoryIl2CppArg = "--compiler-flags=\"-mbulk-memory\"";
+
+		/// <summary>Trả về trạng thái bulk memory để PlayerSettings đồng bộ theo.</summary>
+		private static bool ApplyBuilderSetting()
 		{
 			// LoadSettings tự tạo Assets/Editor/StarkBuilderSetting.asset nếu chưa có — ttsdk_tools.dll chỉ đọc đúng đường dẫn đó.
+			bool created = !File.Exists(TikTokEditorPaths.BuilderSettingAsset);
 			StarkBuilderSettings setting = StarkBuilderSettings.LoadSettings();
 			if (setting == null)
 			{
 				Debug.LogWarning($"{LogPrefix} Không tạo được StarkBuilderSetting. Mở TikTokGame/Build Minigame một lần rồi chạy lại.");
-				return;
+				return true;
 			}
 
 			string outputDir = TikTokEditorPaths.DefaultOutputDir;
@@ -83,12 +93,16 @@ namespace AmobearTTMNG.EditorTools
 			SetString(so, "OutputDir", outputDir);
 			SetString(so, "_webglPackagePath", Path.Combine(outputDir, "tt-minigame"));
 			SetBool(so, "isWebGL2", true);
-			SetBool(so, "enableBulkMemory", true);
+			// Mặc định bật (đã chạy thật trên pocket-2). Asset có sẵn thì giữ lựa chọn của dev ở ô "Bulk Memory(beta)"
+			// của TTSDK — game cần tách Wasm phải tắt vì bản bulk memory có thể chưa hỗ trợ subpackage.
+			if (created)
+				SetBool(so, "enableBulkMemory", true);
 			so.ApplyModifiedPropertiesWithoutUndo();
 			setting.Save();
 
 			string appId = TikTokEditorPaths.ReadAppId(setting);
-			Debug.Log($"{LogPrefix} StarkBuilderSetting: OutputDir={outputDir}, WebGL2=on, bulkMemory=on, appId={(string.IsNullOrEmpty(appId) ? "<CHƯA ĐIỀN>" : appId)}");
+			Debug.Log($"{LogPrefix} StarkBuilderSetting: OutputDir={outputDir}, WebGL2=on, bulkMemory={(setting.enableBulkMemory ? "on" : "off")}, appId={(string.IsNullOrEmpty(appId) ? "<CHƯA ĐIỀN>" : appId)}");
+			return setting.enableBulkMemory;
 		}
 
 		private static void EnsureAdsConfig()

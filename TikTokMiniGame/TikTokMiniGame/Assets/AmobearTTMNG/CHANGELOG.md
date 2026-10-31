@@ -1,5 +1,25 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- `TikTokLogin`: Silent Login (`tt.login`) theo checklist Acceptance Testing (bắt buộc kể cả game chỉ có ads). Không
+  cần backend — chỉ giữ `Code`; `OnLoggedIn` / `OnLoginFailed` cho game có server. Kiểm `CanIUse.Login` trước vì
+  TTSDK 1.1.5 chỉ hiện toast và không gọi callback khi không hỗ trợ.
+- `TikTokBootstrap`: ô **Silent Login** (mặc định bật) gọi `TikTokLogin.Login()` khi SDK sẵn sàng.
+- Validate Project: thêm mục test máy thật cho Silent Login.
+
+### Changed
+- Prefab `TikTokFeatureCanvas` / `TikTokFeatureUI` / `Shortcut` / `Sidebar` / `Share` theo layout scene Demo: ba nút
+  vuông 160×160 xếp dọc bên phải, cách nhau 40, chữ xuống dòng + tự co 18–72. Sửa tại chỗ nên instance đã có trong game
+  vẫn giữ override. Layout gom về `Editor/TikTokFeatureLayout` dùng chung cho Setup Feature UI và công cụ sinh prefab.
+- Ba nút neo góc trên-phải; nhóm `Buttons` gắn `SafeAreaFitter` để không bị nút capsule của TikTok che trên màn hình
+  dài (Setup Feature UI chỉ gắn khi nhóm nằm trực tiếp dưới Canvas). Scene Demo đổi theo.
+- `Setup Project` giữ lựa chọn Bulk Memory có sẵn trong StarkBuilderSetting (chỉ bật mặc định khi tạo mới) và đồng bộ
+  cờ `-mbulk-memory` trong emscriptenArgs / IL2CPP args — TTSDK 1.1.5 không gỡ cờ emscripten khi tắt.
+- `Validate Project` cảnh báo khi cờ bulk memory lệch với lựa chọn; `Validate Last Build` hướng dẫn tắt bulk memory khi
+  `wasmFuncCount` ≥ 80000 cần tách Wasm.
+
 ## [1.1.0] — 2026-10-29
 
 Dùng repo TTMNGDoc làm git submodule trong game (`tools/add-ttmng.ps1` / `.sh`).

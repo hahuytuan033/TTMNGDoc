@@ -95,6 +95,8 @@ namespace AmobearTTMNG.EditorTools
 				report.Info($"App ID {appId}.");
 			if (settings != null && string.IsNullOrEmpty(settings.OutputDir))
 				report.Warning("StarkBuilderSetting.OutputDir trống — chạy AmobearTTMNG/Setup Project.");
+			if (settings != null)
+				CheckBulkMemory(report, settings.enableBulkMemory);
 
 			CheckRootProjectConfig(report, appId);
 			CheckBootstrapScene(report);
@@ -114,6 +116,17 @@ namespace AmobearTTMNG.EditorTools
 			Match match = Regex.Match(File.ReadAllText(path), "\"appid\"\\s*:\\s*\"([^\"]*)\"");
 			if (match.Success && match.Groups[1].Value != appId)
 				report.Warning($"project.config.json ở thư mục gốc có appid=\"{match.Groups[1].Value}\" khác App ID — lưu lại qua AmobearTTMNG/Set App ID.");
+		}
+
+		// TTSDK chỉ gỡ cờ IL2CPP khi tắt bulk memory, cờ trong emscriptenArgs ở lại → bản build vẫn có bulk memory.
+		private static void CheckBulkMemory(TikTokValidationReport report, bool enabled)
+		{
+			bool emscripten = (PlayerSettings.WebGL.emscriptenArgs ?? string.Empty).Contains(TikTokProjectSetup.BulkMemoryFlag);
+			bool il2cpp = (PlayerSettings.GetAdditionalIl2CppArgs() ?? string.Empty).Contains(TikTokProjectSetup.BulkMemoryIl2CppArg);
+			if (emscripten != enabled || il2cpp != enabled)
+				report.Warning($"Bulk Memory {(enabled ? "bật" : "tắt")} nhưng PlayerSettings chưa khớp (emscriptenArgs={emscripten}, il2cppArgs={il2cpp}) — chạy lại AmobearTTMNG/Setup Project.");
+			else
+				report.Info($"Bulk Memory {(enabled ? "bật" : "tắt")}.");
 		}
 
 		private static void CheckBootstrapScene(TikTokValidationReport report)
@@ -191,6 +204,9 @@ namespace AmobearTTMNG.EditorTools
 						report.Warning($"game.json: sdkVersion=\"{game.sdkVersion}\" (mong đợi {TikTokEditorPaths.ExpectedSdkVersion}).");
 					if (game.wasmFuncCount <= 0)
 						report.Warning("game.json: wasmFuncCount=0 — TTSDK không đọc được số hàm wasm, kiểm tra log build.");
+					else if (game.wasmFuncCount >= TikTokEditorPaths.WasmSplitThreshold && StarkBuilderSettings.LoadSettings(false)?.enableBulkMemory == true)
+						report.Warning($"wasmFuncCount={game.wasmFuncCount} ≥ {TikTokEditorPaths.WasmSplitThreshold} — cần tách Wasm, nhưng bản build có Bulk Memory có thể chưa hỗ trợ subpackage. " +
+							"Tắt Bulk Memory(beta) trong cửa sổ build TTSDK → chạy AmobearTTMNG/Setup Project → build lại → tách Wasm bằng menu Wasm split của TTSDK (StarkWebGLBuilder) → test lại tutorial + level đầu.");
 					else if (game.wasmFuncCount >= TikTokEditorPaths.WasmSplitThreshold)
 						report.Warning($"wasmFuncCount={game.wasmFuncCount} ≥ {TikTokEditorPaths.WasmSplitThreshold} — cần tách Wasm (Unity Wasm Code Splitting Guide), test lại tutorial + level đầu.");
 					else

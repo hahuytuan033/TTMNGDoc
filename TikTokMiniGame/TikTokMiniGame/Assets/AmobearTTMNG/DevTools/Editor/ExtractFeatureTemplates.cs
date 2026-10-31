@@ -9,6 +9,7 @@ using UnityEngine.UI;
 using TMPro;
 using TikTokMiniGameDemo;
 using AmobearTTMNG.UI;
+using AmobearTTMNG.EditorTools;
 public static class ExtractFeatureTemplates
 {
     public static string Execute()
@@ -102,13 +103,7 @@ public static class ExtractFeatureTemplates
         // Instruction copy must not promise the demo's fixed 100-coin reward.
         foreach(var text in go.GetComponentsInChildren<TMP_Text>(true)) text.text=text.text.Replace("100 coins", "your reward").Replace("100 Coins", "your reward");
         foreach (var label in buttonCopy.GetComponentsInChildren<TMP_Text>(true))
-        {
-            label.enableAutoSizing = true;
-            label.fontSizeMax = label.fontSize;
-            label.fontSizeMin = 18;
-            label.enableWordWrapping = false;
-            label.margin = new Vector4(12, 0, 12, 0);
-        }
+            TikTokFeatureLayout.ApplyLabel(label);
         popupCopy.SetActive(false);
         buttonCopy.SetActive(true);
         PrefabUtility.SaveAsPrefabAsset(go,root+"/Prefabs/"+kind+".prefab");

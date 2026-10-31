@@ -24,6 +24,9 @@ namespace AmobearTTMNG
 		[Tooltip("Hết thời gian chờ callback InitSDK thì vẫn vào game (Editor không bao giờ gọi callback).")]
 		[SerializeField] private float initTimeoutSeconds = 8f;
 
+		[Tooltip("Gọi Silent Login (tt.login) khi SDK sẵn sàng. Checklist duyệt của TikTok yêu cầu — chỉ tắt nếu game tự gọi TikTokLogin.Login.")]
+		[SerializeField] private bool silentLogin = true;
+
 		[SerializeField] private int targetFrameRate = 60;
 
 		public static TikTokBootstrap Instance { get; private set; }
@@ -177,6 +180,8 @@ namespace AmobearTTMNG
 			Debug.Log($"[TikTokBootstrap] InitSDK ok. TTSDK={TT.TTSDKVersion} Container={TT.GetContainerVersion()}");
 			RegisterLifecycle();
 			LogLaunchOptions();
+			if (silentLogin)
+				TikTokLogin.Login();
 
 			Action callbacks = SdkReady;
 			SdkReady = null;

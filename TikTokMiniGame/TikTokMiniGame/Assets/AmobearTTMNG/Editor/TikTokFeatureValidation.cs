@@ -80,7 +80,8 @@ namespace AmobearTTMNG.EditorTools
             Evidence(report, sources, "Shortcut", @"\b(?:TikTokShortcut\s*\.\s*Add|TT\s*\.\s*AddShortcut)\s*\(", "TikTokShortcut.Add");
             Evidence(report, sources, "Share", @"\b(?:TikTokShare\s*\.\s*Share|TT\s*\.\s*ShareAppMessage)\s*\(", "TikTokShare.Share");
             report.Info("[Features] Đây là kiểm tra tĩnh: loại code SDK/Editor/Demo đi kèm khỏi bằng chứng. Có lời gọi API không chứng minh nút UI được nối hoặc code nằm trong scene build; alias/DLL/reflection có thể không được phát hiện.");
-            report.Info("[Test máy thật/Ads] Kiểm tra rewarded xem hết mới thưởng, đóng sớm không thưởng, lỗi/no-fill không kẹt; interstitial đóng xong tiếp tục game.");
+            report.Info("[Test máy thật/Login] Mở game lần đầu phải thấy thông báo Silent Login của TikTok và log '[Login] ok'; checklist duyệt bắt buộc mục này. TikTokBootstrap tự gọi khi ô Silent Login đang bật.");
+            report.Info("[Test máy thật/Ads]Kiểm tra rewarded xem hết mới thưởng, đóng sớm không thưởng, lỗi/no-fill không kẹt; interstitial đóng xong tiếp tục game.");
             report.Info("[Test máy thật/Revisit Sidebar] Kiểm tra nút mở nhiệm vụ, quay lại từ sidebar, kiểm tra điều kiện và cấp thưởng đúng một lần theo kỳ nếu game có thưởng.");
             report.Info("[Test máy thật/Shortcut] Kiểm tra thêm shortcut và mở lại từ shortcut; nếu có thưởng, kiểm tra điều kiện và chống nhận lặp.");
             report.Info("[Test máy thật/Share] Kiểm tra nút chia sẻ, callback thành công/hủy/lỗi và dữ liệu query khi mở game từ link share.");

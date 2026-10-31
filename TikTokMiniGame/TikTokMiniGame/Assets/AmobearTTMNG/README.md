@@ -40,7 +40,7 @@ Commit submodule pointer, `.gitmodules`, meta thư mục, manifest/lock và các
 
 ### Cách nhanh nhất: kéo Canvas vào scene
 
-Kéo **`Assets/AmobearTTMNG/UI/Prefabs/TikTokFeatureCanvas.prefab`** từ Project vào Hierarchy của scene game (đặt ở scene root). Đã có sẵn Canvas Overlay, CanvasScaler 1080×1920, GraphicRaycaster, controller, ba button và ba popup nối đầy đủ. Không cần chạy Setup Feature UI/Connect hoặc gán OnClick. Khi chạy, prefab tái sử dụng EventSystem đang có; nếu thiếu, tự tạo EventSystem với input module theo Input Handling. Canvas mặc định sorting order 100, có thể chỉnh trong Inspector.
+Kéo **`Assets/AmobearTTMNG/UI/Prefabs/TikTokFeatureCanvas.prefab`** từ Project vào Hierarchy của scene game (đặt ở scene root). Ba nút vuông nằm góc trên-phải; nhóm `Buttons` có `SafeAreaFitter` nên lúc chạy tự lùi xuống dưới nút capsule của TikTok. Đã có sẵn Canvas Overlay, CanvasScaler 1080×1920, GraphicRaycaster, controller, ba button và ba popup nối đầy đủ. Không cần chạy Setup Feature UI/Connect hoặc gán OnClick. Khi chạy, prefab tái sử dụng EventSystem đang có; nếu thiếu, tự tạo EventSystem với input module theo Input Handling. Canvas mặc định sorting order 100, có thể chỉnh trong Inspector.
 
 Chọn `TikTokFeatureCanvas` để chỉnh giao diện và gán **OnRewardClaimed** của game. Button mở hướng dẫn hoạt động sẵn; Claim chỉ bật sau khi có handler thưởng hợp lệ. Bootstrap SDK vẫn được cài bằng Setup Project tại scene đầu, độc lập với Canvas. Prefab không tự cấp coin hoặc khởi tạo thêm bootstrap. Lưu scene/override ở repo game để không sửa asset gốc trong submodule.
 
@@ -106,6 +106,7 @@ Không commit cấu hình riêng của game vào repo SDK. Bản dev có thể c
 | Module | Dùng để | Ghi chú |
 |---|---|---|
 | `TikTokBootstrap` | InitSDK, `WhenReady`, `WhenSdkReady`, `OnShow`/`OnHide`/`OnShowWithParams` | Xem mục 2.1. OnHide tự `TikTokStorage.Save()`. |
+| `TikTokLogin` | Silent Login (`tt.login`) | Bootstrap tự gọi khi SDK sẵn sàng (ô **Silent Login**). Không backend: chỉ giữ `Code`, game có server thì nghe `OnLoggedIn` để đổi open_id. |
 | `TikTokStorage` | Key-value bền (`tt.setStorageSync`) | Probe ghi→đọc lúc khởi động, hỏng thì fallback PlayerPrefs. Chuỗi rỗng = xoá key. |
 | `TikTokFileSystem` | Ghi/đọc file trong container | `persistentDataPath` / C# file IO KHÔNG bền trên TikTok. Editor trả false/null. |
 | `TikTokAds` + `TikTokAdsConfig` | Rewarded / Interstitial theo label | Gọi `TT.CreateRewardedVideoAd` / `TT.CreateInterstitialAd` với Placement ID trong config. Chặn sẵn luật 15s / 30s và ad chồng nhau. |
@@ -201,8 +202,10 @@ Mã lỗi chính thức của TikTok (Error Code Reference, phần IAA):
 | `50000` + `inner_error_code` | Lỗi hệ thống (50001 client key sai, 50008 container đang pre-render...) | Gửi support kèm inner code |
 
 Khi duyệt bản phát hành (Acceptance Testing), checklist của TikTok có: **rewarded ad, IAP, Silent Login, Home Screen
-Shortcut, Revisit From Profile**. Template không có IAP / login — lúc Submit for review ghi chú cho reviewer: "game chỉ
-có quảng cáo, không có tài khoản / IAP, dữ liệu lưu cục bộ". Quà shortcut phải **chỉ nhận được một lần**. Test quảng cáo thật thì tắt **Enable IAA Mock** trong DevTool.
+Shortcut, Revisit From Profile**. Silent Login không có chữ "tuỳ chọn" và có lý do từ chối "login failures" — template
+tự gọi `tt.login` (`TikTokLogin`) nên đáp ứng mục này mà không cần backend; đừng tắt ô Silent Login trên `TikTokBootstrap`.
+IAP chỉ bị kiểm khi game có bán — template không có IAP; lúc Submit for review ghi chú: "game chỉ có quảng cáo, không
+bán vật phẩm, dữ liệu lưu cục bộ". Quà shortcut phải **chỉ nhận được một lần**. Test quảng cáo thật thì tắt **Enable IAA Mock** trong DevTool.
 
 ---
 
@@ -226,4 +229,7 @@ Gửi một lần: ClientKey, Unity version, TikTok Unity SDK version, cấu tr�
 có bật Wasm split không, TikTok App version, thiết bị + OS, SystemInfo, lỗi đầu tiên, build log, các bước tái hiện,
 video. Các module đã log kèm `platform / system / tiktok version` (`TikTokShortcut.DeviceInfo()`).
 
-Khi `game.json.wasmFuncCount` ≥ 80000 → xem Unity Wasm Code Splitting Guide.
+Khi `game.json.wasmFuncCount` ≥ 80000 → xem Unity Wasm Code Splitting Guide. Setup bật **Bulk Memory** mặc định, nhưng
+bản build có bulk memory có thể chưa hỗ trợ subpackage: game cần tách Wasm thì tắt ô **Bulk Memory(beta)** trong cửa sổ
+build của TTSDK → chạy lại `Setup Project` (gỡ cờ `-mbulk-memory` khỏi PlayerSettings — TTSDK không tự gỡ) → build lại →
+tách Wasm. Setup giữ lựa chọn này ở các lần chạy sau; `Validate Project` cảnh báo nếu cờ và lựa chọn lệch nhau.

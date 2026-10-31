@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using AmobearTTMNG.EditorTools;
 using AmobearTTMNG.UI;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -20,9 +21,7 @@ public static class BuildCompleteFeaturePrefab
             Stretch((RectTransform)root.transform);
             var ui = root.GetComponent<TikTokFeatureUI>();
             var buttons = new GameObject("Buttons", typeof(RectTransform)); buttons.transform.SetParent(root.transform, false);
-            var r = (RectTransform)buttons.transform;
-            r.anchorMin = r.anchorMax = new Vector2(1, 0.5f); r.pivot = new Vector2(1, 0.5f);
-            r.sizeDelta = new Vector2(280, 360); r.anchoredPosition = new Vector2(-24, 0);
+            TikTokFeatureLayout.ApplyGroup((RectTransform)buttons.transform, fitSafeArea: true);
             var popups = new GameObject("AmobearTikTokPopups", typeof(RectTransform)); popups.transform.SetParent(root.transform, false);
             ui.PopupsRoot = (RectTransform)popups.transform; Stretch(ui.PopupsRoot);
             foreach (TikTokUIFeature kind in Enum.GetValues(typeof(TikTokUIFeature)))
@@ -31,9 +30,7 @@ public static class BuildCompleteFeaturePrefab
                 if (!source) throw new Exception("Missing template " + kind);
                 var go = UnityEngine.Object.Instantiate(source, buttons.transform, false); go.name = kind.ToString();
                 var view = go.GetComponent<TikTokFeatureView>();
-                var holder = (RectTransform)go.transform;
-                holder.anchorMin = holder.anchorMax = new Vector2(0.5f, 1); holder.pivot = new Vector2(0.5f, 1);
-                holder.sizeDelta = new Vector2(260, 90); holder.anchoredPosition = new Vector2(0, -110 * (int)kind);
+                TikTokFeatureLayout.ApplyEntry((RectTransform)go.transform, (int)kind);
                 Stretch((RectTransform)view.EntryButton.transform);
                 view.Popup.transform.SetParent(popups.transform, false); Stretch((RectTransform)view.Popup.transform); view.Popup.SetActive(false);
                 ui.Features.Add(view);

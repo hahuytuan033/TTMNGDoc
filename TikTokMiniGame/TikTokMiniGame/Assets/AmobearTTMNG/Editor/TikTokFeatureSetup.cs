@@ -135,11 +135,10 @@ namespace AmobearTTMNG.EditorTools
                 {
                     var go = Create(created, "AmobearTikTokUI", scene, typeof(RectTransform), typeof(TikTokFeatureUI));
                     go.transform.SetParent(parent, false);
-                    var rect = (RectTransform)go.transform;
-                    rect.anchorMin = rect.anchorMax = new Vector2(1, 0.5f);
-                    rect.pivot = new Vector2(1, 0.5f);
-                    rect.sizeDelta = new Vector2(280, 360);
-                    rect.anchoredPosition = new Vector2(-24, 0);
+                    bool fitSafeArea = parent == canvas.transform;
+                    if (!fitSafeArea)
+                        Debug.LogWarning("[TikTokSetup] Nhóm nút không nằm trực tiếp dưới Canvas nên không gắn SafeAreaFitter — tự kiểm tra nút không bị capsule TikTok che.");
+                    TikTokFeatureLayout.ApplyGroup((RectTransform)go.transform, fitSafeArea);
                     existing = go.GetComponent<TikTokFeatureUI>();
                     existing.AutoOpenClaim = autoClaim;
                     var popups = Create(created, "AmobearTikTokPopups", scene, typeof(RectTransform));
@@ -158,11 +157,7 @@ namespace AmobearTTMNG.EditorTools
                     SceneManager.MoveGameObjectToScene(go, scene);
                     go.transform.SetParent(existing.transform, false);
                     var view = go.GetComponent<TikTokFeatureView>();
-                    var holder = (RectTransform)go.transform;
-                    holder.anchorMin = holder.anchorMax = new Vector2(0.5f, 1);
-                    holder.pivot = new Vector2(0.5f, 1);
-                    holder.sizeDelta = new Vector2(260, 90);
-                    holder.anchoredPosition = new Vector2(0, -features.Count * 110);
+                    TikTokFeatureLayout.ApplyEntry((RectTransform)go.transform, features.Count);
                     Stretch((RectTransform)view.EntryButton.transform);
                     view.Popup.transform.SetParent(existing.PopupsRoot, false);
                     Stretch((RectTransform)view.Popup.transform);

@@ -18,6 +18,9 @@ namespace AmobearTTMNG.EditorTools
 
 		public const string SdkPackageJson = "Assets/Plugins/com.tiktok.minigame/package.json";
 
+		/// <summary>ttsdk_tools.dll chỉ đọc StarkBuilderSetting ở đúng đường dẫn này.</summary>
+		public const string BuilderSettingAsset = "Assets/Editor/StarkBuilderSetting.asset";
+
 		/// <summary>TikTok giới hạn tổng gói Unity 60MB (Unity Integration Guide).</summary>
 		public const long PackageLimitBytes = 60L * 1024 * 1024;
 
