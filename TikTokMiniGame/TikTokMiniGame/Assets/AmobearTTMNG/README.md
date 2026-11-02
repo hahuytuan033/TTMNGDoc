@@ -58,6 +58,19 @@ Mở **AmobearTTMNG → Setup Feature UI → Kết nối UI có sẵn / Repair R
 
 Connect chỉ thêm controller/view còn thiếu và cập nhật các tham chiếu được chọn; bỏ tick không xóa tính năng. Có Undo/Redo, không tự lưu scene hoặc đổi Build Settings. Trong Inspector controller, **Repair References** mở lại cùng cửa sổ với dữ liệu hiện có; **Select Button / Select Popup** chọn đúng object để sửa giao diện. Nếu đang dùng UI copy từ Demo, dùng Connect thay vì chỉ copy Canvas — Canvas Demo không chứa controller xử lý các nút.
 
+### Prefab UI của game (variant, không sửa prefab SDK)
+
+Khi SDK là git submodule, sau khi Unity compile xong sẽ tự tạo các prefab còn thiếu trong `Assets/AmobearTTMNGConfig/UI`
+(`TikTokFeatureCanvas`, `TikTokFeatureUI`, `Shortcut`, `Sidebar`, `Share`). Đây là **Prefab Variant** của prefab trong
+`AmobearTTMNG/UI/Prefabs`:
+
+- Game sửa UI trên variant: override lưu trong project game, commit cùng game, không làm bẩn submodule.
+- SDK cập nhật prefab gốc → sau khi pull submodule, phần chưa override trong variant tự cập nhật theo; phần game đã sửa giữ nguyên.
+- Prefab gốc trong submodule bị khóa: Inspector không cho sửa và Unity không lưu thay đổi vào đó (kể cả *Apply to Base*).
+- Setup Feature UI và các nút Select prefab dùng variant của game nếu có. Xóa một variant thì lần compile sau tạo lại
+  bản mới từ SDK; menu **AmobearTTMNG → Create Game UI Prefabs** tạo ngay.
+- Repo phát triển SDK (thư mục không phải submodule) không khóa và không tự tạo variant.
+
 ### Tạo UI mẫu theo từng tính năng
 
 1. Mở scene muốn đặt UI và đặt scene đó **active** nếu đang mở additive.

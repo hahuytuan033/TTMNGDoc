@@ -31,10 +31,12 @@ namespace AmobearTTMNG.EditorTools
         private void OnGUI()
         {
             if (GUILayout.Button("Select TikTokFeatureCanvas prefab (drag into scene)"))
-                Selection.activeObject = AssetDatabase.LoadAssetAtPath<GameObject>(SdkRoot + "/UI/Prefabs/TikTokFeatureCanvas.prefab");
+                Selection.activeObject = TikTokUIPrefabs.Load("TikTokFeatureCanvas");
             if (GUILayout.Button("Kết nối UI có sẵn / Repair References")) TikTokFeatureConnect.OpenWindow();
             if (GUILayout.Button("Select complete TikTokFeatureUI prefab"))
-                Selection.activeObject = AssetDatabase.LoadAssetAtPath<GameObject>(SdkRoot + "/UI/Prefabs/TikTokFeatureUI.prefab");
+                Selection.activeObject = TikTokUIPrefabs.Load("TikTokFeatureUI");
+            if (TikTokUIPrefabs.IsSubmodule)
+                EditorGUILayout.HelpBox("Prefab UI của game nằm trong " + TikTokUIPrefabs.GameFolder + " (variant của prefab SDK). Sửa UI ở đó; SDK cập nhật thì phần chưa sửa tự cập nhật theo.", MessageType.None);
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Scene: " + SceneManager.GetActiveScene().name, EditorStyles.boldLabel);
             parent = (RectTransform)EditorGUILayout.ObjectField("Canvas / UI parent", parent, typeof(RectTransform), true);
@@ -96,7 +98,7 @@ namespace AmobearTTMNG.EditorTools
                 if (canvas) parent = (RectTransform)canvas.transform;
             }
             var missing = selected.Distinct().Where(k => !existing || !existing.Features.Any(v => v && v.Feature == k)).ToArray();
-            var templates = missing.Select(k => AssetDatabase.LoadAssetAtPath<GameObject>($"{SdkRoot}/UI/Prefabs/{k}.prefab")).ToArray();
+            var templates = missing.Select(k => TikTokUIPrefabs.Load(k.ToString())).ToArray();
             foreach (var template in templates)
             {
                 if (!template || !template.GetComponent<TikTokFeatureView>() || !template.GetComponent<TikTokFeatureView>().HasReferences)

@@ -8,8 +8,17 @@
   TTSDK 1.1.5 chỉ hiện toast và không gọi callback khi không hỗ trợ.
 - `TikTokBootstrap`: ô **Silent Login** (mặc định bật) gọi `TikTokLogin.Login()` khi SDK sẵn sàng.
 - Validate Project: thêm mục test máy thật cho Silent Login.
+- `TikTokShortcut.HasAdded`: ghi nhớ đã thêm shortcut (Add thành công hoặc từng mở game từ icon). Popup Shortcut lần
+  sau hiện nội dung "đã tạo shortcut" với nút OK (`AddedTitle` / `AddedDescription` / `AddedClaimedDescription` /
+  `AddedAction` sửa trong Inspector). Add thành công thì đóng popup.
+- `TikTokUIPrefabs`: khi SDK là submodule, tự tạo Prefab Variant của 5 prefab UI trong `Assets/AmobearTTMNGConfig/UI`
+  để game tùy chỉnh mà vẫn nhận cập nhật từ SDK; khóa prefab gốc trong submodule (không sửa / không lưu được).
+  Menu `AmobearTTMNG/Create Game UI Prefabs`. Setup Feature UI dùng variant của game nếu có.
 
 ### Changed
+- `TikTokShare`: mặc định mỗi lần share một quà — Claim xong mới share tiếp (`ClaimPeriod` = mỗi lần share một kỳ).
+  Muốn một lần/ngày như cũ thì gán `ClaimPeriod = () => DateTime.UtcNow.ToString("yyyyMMdd")`.
+- `TikTokNetwork`: `HookListeners` ngoài WebGL bỏ qua khi đã hook.
 - Prefab `TikTokFeatureCanvas` / `TikTokFeatureUI` / `Shortcut` / `Sidebar` / `Share` theo layout scene Demo: ba nút
   vuông 160×160 xếp dọc bên phải, cách nhau 40, chữ xuống dòng + tự co 18–72. Sửa tại chỗ nên instance đã có trong game
   vẫn giữ override. Layout gom về `Editor/TikTokFeatureLayout` dùng chung cho Setup Feature UI và công cụ sinh prefab.
