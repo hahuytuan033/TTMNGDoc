@@ -20,6 +20,11 @@ namespace AmobearTTMNG.UI
         public Button BackgroundButton;
         public Button CloseButton;
         [TextArea] public string RewardDescription = "Your reward is ready. Tap Claim to receive it.";
+        [Header("Shortcut only: shown after the shortcut was added")]
+        public string AddedTitle = "Shortcut Added";
+        [TextArea] public string AddedDescription = "Shortcut created successfully! Open the game from your home-screen icon to claim your reward.";
+        [TextArea] public string AddedClaimedDescription = "Shortcut created successfully! Open the game from your home-screen icon anytime.";
+        public string AddedAction = "OK";
         [Tooltip("Connect a game reward method here before enabling Claim. Do not also grant this reward through the module's global event.")]
         public UnityEvent OnRewardClaimed = new UnityEvent();
         [Tooltip("Query sent when sharing; no demo wallet information is included.")]
@@ -35,6 +40,7 @@ namespace AmobearTTMNG.UI
         internal bool Supported;
         internal bool Busy;
         internal bool ClaimMode;
+        internal bool AddedMode;
 
         public bool HasPendingReward => Feature == TikTokUIFeature.Shortcut ? TikTokShortcut.HasPendingReward
             : Feature == TikTokUIFeature.Sidebar ? TikTokSidebar.HasPendingReward : TikTokShare.HasPendingReward;
@@ -102,16 +108,19 @@ namespace AmobearTTMNG.UI
         {
             CacheContent();
             ClaimMode = HasPendingReward;
-            Title.text = ClaimMode ? "Reward" : authoredTitle;
+            // Shortcut already created: informational popup, the action button just closes it.
+            AddedMode = !ClaimMode && Feature == TikTokUIFeature.Shortcut && TikTokShortcut.HasAdded;
+            Title.text = ClaimMode ? "Reward" : AddedMode ? AddedTitle : authoredTitle;
             Description.text = ClaimMode
                 ? (HasValidRewardHandler() ? RewardDescription : "Reward is pending. The game has not configured its reward handler yet.")
+                : AddedMode ? (TikTokShortcut.HasClaimedThisPeriod ? AddedClaimedDescription : AddedDescription)
                 : authoredDescription;
-            if (actionLabel) actionLabel.text = ClaimMode ? "Claim" : authoredAction;
-            foreach (var item in guide) if (item) item.SetActive(!ClaimMode);
-            Description.rectTransform.sizeDelta = ClaimMode
+            if (actionLabel) actionLabel.text = ClaimMode ? "Claim" : AddedMode ? AddedAction : authoredAction;
+            foreach (var item in guide) if (item) item.SetActive(!ClaimMode && !AddedMode);
+            Description.rectTransform.sizeDelta = ClaimMode || AddedMode
                 ? new Vector2(descriptionSize.x, Mathf.Max(descriptionSize.y, Description.GetPreferredValues(Description.text, Description.rectTransform.rect.width, 0).y))
                 : descriptionSize;
-            ActionButton.interactable = !Busy && (ClaimMode ? HasValidRewardHandler() : Supported);
+            ActionButton.interactable = !Busy && (ClaimMode ? HasValidRewardHandler() : AddedMode || Supported);
             Popup.SetActive(true);
             Popup.transform.SetAsLastSibling();
         }

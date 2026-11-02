@@ -169,7 +169,12 @@ namespace AmobearTTMNG
 			listenersHooked = false;
 		}
 #else
-		private static void HookListeners() => listenersHooked = true;
+		private static void HookListeners()
+		{
+			if (listenersHooked)
+				return;
+			listenersHooked = true;
+		}
 
 		/// <summary>Gỡ listener khỏi container. Gọi khi teardown để không tích luỹ callback.</summary>
 		public static void Unhook() => listenersHooked = false;

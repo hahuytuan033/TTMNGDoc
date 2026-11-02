@@ -182,6 +182,7 @@ namespace AmobearTTMNG.UI
                 }
                 return;
             }
+            if (view.AddedMode) { ClosePopup(); return; }
             if (!view.Supported) return;
             view.Busy = true;
             view.ActionButton.interactable = false;
@@ -195,9 +196,10 @@ namespace AmobearTTMNG.UI
                     dismissed.Remove(view.Feature);
                     if (opened == view) view.Show();
                 }
+                else if (opened == view && ok && view.Feature == TikTokUIFeature.Shortcut)
+                    ClosePopup(); // next open shows the "shortcut added" content
                 else if (opened == view)
                     view.ShowResult(!ok ? "This action could not be completed. Please try again."
-                        : view.Feature == TikTokUIFeature.Shortcut ? "Open the game again from your home-screen shortcut to check your reward."
                         : view.Feature == TikTokUIFeature.Sidebar ? "Open the game again from your TikTok Profile sidebar to check your reward."
                         : "Shared successfully.");
                 PendingChanged();

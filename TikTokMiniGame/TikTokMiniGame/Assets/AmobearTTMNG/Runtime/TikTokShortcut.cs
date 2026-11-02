@@ -45,8 +45,12 @@ namespace AmobearTTMNG
 		/// <summary>Chỉ Editor: giả lập phiên hiện tại được mở từ icon màn hình chính.</summary>
 		public static bool EditorSimulateShortcutLaunch;
 
+		private const string AddedKey = "amobear_tt_shortcut_added_v1";
+
+		// Mở được từ icon = icon chắc chắn đang có (bắt cả trường hợp người chơi tự thêm từ UI TikTok).
 		private static readonly TikTokMissionLedger Ledger = new TikTokMissionLedger(
-			LogPrefix, "amobear_tt_shortcut", () => ClaimPeriod?.Invoke(), () => ServerClaim, CheckReward, checkOnLaunch: true);
+			LogPrefix, "amobear_tt_shortcut", () => ClaimPeriod?.Invoke(), () => ServerClaim,
+			done => CheckReward(can => { if (can) MarkAdded(); done?.Invoke(can); }), checkOnLaunch: true);
 
 		/// <summary>Có quà mới chờ Claim, hoặc quà vừa được Claim. UI bật/tắt popup Claim theo <see cref="HasPendingReward"/>.</summary>
 		public static event Action OnPendingRewardChanged
@@ -118,6 +122,22 @@ namespace AmobearTTMNG
 		/// <summary>Đã bấm Add, đang chờ người chơi mở lại từ icon.</summary>
 		public static bool IsWaitingForRevisit => Ledger.IsArmed;
 
+		/// <summary>
+		/// Người chơi đã thêm icon (Add thành công hoặc đã từng mở game từ icon) — UI đổi nội dung popup.
+		/// Chỉ là sổ cục bộ: nền tảng không có API hỏi icon còn trên màn hình hay không, người chơi xoá icon
+		/// thì cờ này vẫn true — nên vẫn giữ nút Add để thêm lại (doc khuyên giữ nút sau khi thêm).
+		/// </summary>
+		public static bool HasAdded => TikTokStorage.GetInt(AddedKey, 0) > 0;
+
+		private static void MarkAdded()
+		{
+			if (HasAdded)
+				return;
+			TikTokStorage.SetInt(AddedKey, 1);
+			TikTokStorage.Save();
+			Log("marked added");
+		}
+
 		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
 		private static void Initialize()
 		{
@@ -143,6 +163,7 @@ namespace AmobearTTMNG
 		{
 #if UNITY_EDITOR
 			Log("add (editor) ok");
+			MarkAdded();
 			Ledger.ArmPending();
 			onDone?.Invoke(true);
 #else
@@ -162,6 +183,7 @@ namespace AmobearTTMNG
 						if (ok)
 						{
 							Log("add ok");
+							MarkAdded();
 							Ledger.ArmPending();
 						}
 						else
@@ -193,7 +215,11 @@ namespace AmobearTTMNG
 		public static void Claim(Action<bool> onDone = null) => Ledger.Claim(onDone);
 
 		/// <summary>Chỉ để test: xóa sổ cục bộ (không reset được trạng thái phía nền tảng).</summary>
-		public static void ResetLocalLedger() => Ledger.Reset();
+		public static void ResetLocalLedger()
+		{
+			TikTokStorage.DeleteKey(AddedKey);
+			Ledger.Reset();
+		}
 
 		/// <summary>
 		/// API thô: hỏi nền tảng phiên hiện tại có đủ điều kiện thưởng shortcut không (getShortcutMissionReward).

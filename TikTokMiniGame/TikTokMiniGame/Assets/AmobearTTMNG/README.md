@@ -112,7 +112,7 @@ Không commit cấu hình riêng của game vào repo SDK. Bản dev có thể c
 | `TikTokAds` + `TikTokAdsConfig` | Rewarded / Interstitial theo label | Gọi `TT.CreateRewardedVideoAd` / `TT.CreateInterstitialAd` với Placement ID trong config. Chặn sẵn luật 15s / 30s và ad chồng nhau. |
 | `TikTokShortcut` | Desktop Shortcut Revisit | Nhận quà hai bước. Mặc định nhận **một lần**. |
 | `TikTokSidebar` | Sidebar Revisit | Nhận quà hai bước. Mặc định **mỗi ngày một lần**. |
-| `TikTokShare` | `shareAppMessage` + đọc query khi bạn bè mở | Quà share tuỳ chọn, mỗi ngày một lần. |
+| `TikTokShare` | `shareAppMessage` + đọc query khi bạn bè mở | Quà share tuỳ chọn, mỗi lần share một quà (Claim xong mới share tiếp); đổi `ClaimPeriod` để giới hạn theo ngày. |
 | `TikTokSafeArea` / `SafeAreaFitter` | Vùng an toàn + vùng nút capsule | WebGL `Screen.safeArea` luôn trả toàn màn hình — phải dùng module này. |
 | `TikTokNetwork` | Loại mạng, mất mạng, mạng yếu | `OnChanged` replay-on-subscribe. |
 | `TikTokVibrate` | Rung ngắn / dài | Chặn gọi dồn 0.1s; `Enabled = false` khi người chơi tắt rung. |

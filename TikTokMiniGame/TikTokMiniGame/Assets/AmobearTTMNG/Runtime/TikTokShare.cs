@@ -20,8 +20,9 @@ namespace AmobearTTMNG
 	/// QUÀ SHARE (tùy chọn, như pocket-2): share thành công → lưu quyền nhận quà ngay
 	/// (<see cref="HasPendingReward"/>) → game hiện popup Claim → <see cref="Claim"/> → <see cref="OnRewardClaimed"/>.
 	/// ⚠️ Success của shareAppMessage chỉ nói luồng đã mở, KHÔNG đảm bảo người chơi đã gửi, và nền tảng không có
-	/// API xác thực share — nên giới hạn theo <see cref="ClaimPeriod"/> (mặc định mỗi ngày một lần) là hàng rào
-	/// duy nhất chống farm. Game không thưởng share thì bỏ qua phần này.
+	/// API xác thực share. Mặc định mỗi lần share được một quà (phải Claim xong mới share tiếp) — người chơi có
+	/// thể farm bằng cách mở rồi tắt màn hình share; game cần giới hạn thì đổi <see cref="ClaimPeriod"/> (vd theo
+	/// ngày) hoặc chặn trong <see cref="ServerClaim"/>. Game không thưởng share thì bỏ qua phần này.
 	///
 	/// Lưu ý: SDK Unity hiện chưa có wrapper C# cho shareToStory / onCopyUrl.
 	/// Trong Editor không có container: <see cref="Share"/> giả lập thành công, query đọc từ
@@ -40,8 +41,12 @@ namespace AmobearTTMNG
 		/// </summary>
 		public static event Action<Dictionary<string, string>> OnShareQuery;
 
-		/// <summary>Khóa kỳ nhận quà share; mặc định theo ngày (UTC) → một lần/ngày.</summary>
-		public static Func<string> ClaimPeriod = () => DateTime.UtcNow.ToString("yyyyMMdd");
+		/// <summary>
+		/// Khóa kỳ nhận quà share. Mặc định mỗi lần share là một kỳ riêng → share xong nhận quà, Claim xong mới
+		/// share tiếp được (popup đang ở chế độ Claim thì không share được). Muốn một lần/ngày:
+		/// gán = () =&gt; DateTime.UtcNow.ToString("yyyyMMdd").
+		/// </summary>
+		public static Func<string> ClaimPeriod = () => "share-" + DateTime.UtcNow.Ticks;
 
 		/// <summary>Hook backend chặn trùng theo open_id + kỳ (xem <see cref="TikTokShortcut.ServerClaim"/>). Null = sổ cục bộ.</summary>
 		public static Action<string, Action<bool>> ServerClaim;
