@@ -14,6 +14,11 @@
 - `TikTokUIPrefabs`: khi SDK là submodule, tự tạo Prefab Variant của 5 prefab UI trong `Assets/AmobearTTMNGConfig/UI`
   để game tùy chỉnh mà vẫn nhận cập nhật từ SDK; khóa prefab gốc trong submodule (không sửa / không lưu được).
   Menu `AmobearTTMNG/Create Game UI Prefabs`. Setup Feature UI dùng variant của game nếu có.
+- `TikTokCapsuleGuide` (`Assets/Games/Scripts/TikTok`): vẽ lên Game view capsule `••• ✕` của TikTok
+  kèm vùng cấm đỏ để đặt HUD góc trên-phải không bị che. Số đo lấy từ Samsung A52; dùng `Screen.safeArea` khi bật
+  Device Simulator. Bật / tắt ở menu `Tools/TT MiniGame/Show TikTok Capsule Guide`. Chỉ có trong Editor (cả file nằm
+  trong `#if UNITY_EDITOR`), không vào bản build. Sau domain reload không sinh thêm overlay trùng — `Ensure()` tìm lại
+  overlay có sẵn thay vì dựa vào biến static.
 
 ### Changed
 - `TikTokShare`: mặc định mỗi lần share một quà — Claim xong mới share tiếp (`ClaimPeriod` = mỗi lần share một kỳ).

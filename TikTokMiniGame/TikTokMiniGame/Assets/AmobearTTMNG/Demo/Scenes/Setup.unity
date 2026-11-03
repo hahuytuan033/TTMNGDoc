@@ -154,6 +154,7 @@ MonoBehaviour:
   nextScene: Demo
   muteAudioWhenHidden: 1
   initTimeoutSeconds: 8
+  silentLogin: 1
   targetFrameRate: 60
 --- !u!4 &789938817
 Transform:
